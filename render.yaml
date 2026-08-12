@@ -13,7 +13,7 @@ services:
       - key: SQUARE_ACCESS_TOKEN
         sync: false
       - key: SQUARE_ENV
-        value: sandbox
+        value: production
       # Terminal (nút Card trên Expo) — lấy sau khi ghép máy Square Terminal.
       - key: SQUARE_DEVICE_ID
         sync: false
