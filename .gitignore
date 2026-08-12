@@ -1,0 +1,5 @@
+# KHÔNG bao giờ commit token Square
+.env
+__pycache__/
+*.pyc
+order/qr/

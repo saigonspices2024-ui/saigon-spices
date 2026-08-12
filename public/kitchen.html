@@ -1,0 +1,26 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kitchen">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d1117">
+<title>KDS — Kitchen</title>
+<link rel="manifest" href="/manifest-kitchen.webmanifest">
+<link rel="apple-touch-icon" href="/icon-kitchen-180.png">
+<link rel="stylesheet" href="/kds.css">
+<div class="bar">
+  <h1>SAIGON SPICES</h1>
+  <select class="station-select" id="stationPick" aria-label="Choose station">
+    <option value="">All stations</option>
+  </select>
+  <span class="spacer"></span>
+  <span class="count" id="count">0 orders</span>
+  <span class="clock" id="clock">--:--</span>
+  <button class="sound-btn" id="soundBtn">🔇 Sound: Off</button>
+  <a class="hist-btn" href="/history" onclick="localStorage.setItem('kds_hist_from', window.KDS_STATION)">🕘 History</a>
+  <span class="conn" id="conn"><span class="dot"></span><span class="txt"></span></span>
+</div>
+<div class="grid" id="grid"></div>
+<script>window.KDS_STATION = "kitchen";</script>
+<script src="/kds.js"></script>

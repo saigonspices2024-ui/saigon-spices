@@ -1,0 +1,446 @@
+:root {
+  --bg: #0d1117;
+  --panel: #161b22;
+  --card: #1c2330;
+  --line: #2b3444;
+  --text: #e6edf3;
+  --muted: #8b98a9;
+  --accent: #3b82f6;
+  --green: #22c55e;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --dine: #3b82f6;
+  --take: #a855f7;
+  --deliver: #14b8a6;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overscroll-behavior: none;
+}
+
+/* ---- Top bar ------------------------------------------------------- */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.bar h1 { font-size: 20px; font-weight: 700; letter-spacing: .5px; }
+.bar .station-tag {
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  padding: 4px 10px; border-radius: 999px; letter-spacing: 1px;
+}
+.station-tag.kitchen { background: rgba(245,158,11,.15); color: var(--amber); }
+.station-tag.expo    { background: rgba(34,197,94,.15);  color: var(--green); }
+.bar .spacer { flex: 1; }
+.bar .count { font-size: 15px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar .clock { font-size: 15px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.conn { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.conn .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); transition: background .3s; }
+.conn.online .dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.conn.online .txt::after { content: "Online"; }
+.conn:not(.online) .txt::after { content: "Offline"; }
+
+.station-select {
+  background: rgba(245,158,11,.15); color: var(--amber); border: 1px solid var(--amber);
+  border-radius: 999px; padding: 5px 14px; font-size: 14px; font-weight: 700;
+  letter-spacing: .5px; cursor: pointer; -webkit-appearance: none; appearance: none;
+}
+.station-select:focus { outline: none; box-shadow: 0 0 0 3px rgba(245,158,11,.25); }
+
+.sound-btn {
+  background: var(--card); color: var(--muted); border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+}
+.sound-btn.on { color: var(--green); border-color: var(--green); }
+
+/* Nút History (trên màn Bếp + Expo) + trang History */
+.hist-btn {
+  background: var(--card); color: var(--muted); border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600;
+  text-decoration: none;
+}
+.hist-btn:hover { color: var(--text); border-color: var(--accent); }
+.station-tag.hist { background: rgba(59,130,246,.15); color: var(--accent); }
+/* Nút Thu tiền (chỉ màn Expo): nhảy sang màn /staff của app order để bấm
+   Terminal — biến máy Expo thành máy ra món + tính tiền cùng lúc. Tông xanh lá. */
+.pay-btn { color: var(--green); border-color: rgba(34,197,94,.5); }
+.pay-btn:hover { color: var(--green); border-color: var(--green); }
+.backlink { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 600; }
+.backlink:hover { color: var(--text); }
+.badge.SERVED    { background: rgba(34,197,94,.18); color: var(--green); }
+.badge.CANCELLED { background: rgba(239,68,68,.18); color: var(--red); }
+.badge.REDO      { background: var(--amber); color: #3a2c00; }
+/* Nút Redo TỪNG MÓN trên trang History (cạnh giá mỗi món) */
+.item-redo {
+  margin-top: 4px; background: transparent; color: var(--amber);
+  border: 1px solid var(--amber); border-radius: 7px;
+  padding: 4px 10px; font-size: 12px; font-weight: 700;
+  cursor: pointer; white-space: nowrap;
+}
+.item-redo:active { transform: scale(.96); }
+.item-redo.sent { border-color: var(--green); color: var(--green); cursor: default; }
+.hist-times {
+  display: flex; justify-content: space-between; gap: 12px;
+  padding: 10px 14px; border-top: 1px solid var(--line);
+  font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.hist-card .item.voided .name { color: var(--red); }
+
+/* ---- Grid ---------------------------------------------------------- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  padding: 16px;
+  align-content: start;
+}
+.empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--muted);
+  padding: 80px 20px;
+  font-size: 18px;
+}
+
+/* ---- Nhóm bàn (nhiều người cùng bàn) ------------------------------- */
+.tbl-group {
+  grid-column: 1 / -1;                 /* dải ngang cả bàn -> đơn không lạc */
+  border: 2px solid var(--accent);
+  border-radius: 16px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--accent) 6%, var(--card));
+}
+.tbl-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 4px 8px 10px;
+}
+.tbl-title { font-size: 19px; font-weight: 800; color: var(--text); }
+.tbl-sub { font-size: 14px; color: var(--muted); }
+.tbl-pay {
+  margin-left: auto; border: none; border-radius: 10px;
+  padding: 12px 18px; font-size: 16px; font-weight: 800;
+  background: #e0a82e; color: #1a1205; cursor: pointer;
+}
+.tbl-pay:active { transform: scale(.97); }
+.tbl-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+/* ---- Danh sách người trong "Pay together" -------------------------- */
+.pay-people { margin-bottom: 6px; }
+.pay-people[hidden] { display: none; }
+.pay-person {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 12px; border: 1px solid var(--line); border-radius: 10px;
+  margin-bottom: 8px; cursor: pointer;
+}
+.pay-person input { width: 20px; height: 20px; }
+.pay-person .pp-name { flex: 1; font-weight: 700; color: var(--text); }
+.pay-person .pp-amt { font-weight: 800; color: var(--text); }
+.pay-opt:disabled { opacity: .4; cursor: default; }
+
+/* ---- Ticket card --------------------------------------------------- */
+.ticket {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: pop .18s ease;
+}
+@keyframes pop { from { transform: scale(.96); opacity: .4; } to { transform: scale(1); opacity: 1; } }
+.ticket.flash { animation: flash 1s ease 3; }
+@keyframes flash {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
+  50% { box-shadow: 0 0 0 4px rgba(59,130,246,.6); }
+}
+
+.ticket-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.badge {
+  font-size: 12px; font-weight: 800; text-transform: uppercase;
+  padding: 4px 9px; border-radius: 7px; letter-spacing: .5px;
+}
+.badge.DINE_IN  { background: rgba(59,130,246,.18);  color: var(--dine); }
+.badge.TAKEAWAY { background: rgba(168,85,247,.18);  color: var(--take); }
+.badge.DELIVERY { background: rgba(20,184,166,.18);  color: var(--deliver); }
+.badge.UNKNOWN  { background: rgba(148,163,184,.18); color: #94a3b8; }
+.ticket-head .where { font-size: 17px; font-weight: 700; }
+.ticket-head .spacer { flex: 1; }
+.timer {
+  font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums;
+  padding: 3px 8px; border-radius: 7px;
+}
+.timer.ok   { color: var(--green); }
+.timer.warn { color: var(--amber); }
+.timer.late { color: #fff; background: var(--red); animation: pulse 1.2s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+
+/* Note gắn CẢ ĐƠN (vd "dị ứng đậu phộng") — băng đỏ đậm, đập vào mắt ngay.
+   Khác băng "ORDER CANCELLED" (đỏ nhấp nháy): cái này đỏ đậm đứng yên, có ⚠. */
+.order-note {
+  background: #b91c1c; color: #fff;
+  font-weight: 800; font-size: 16px; letter-spacing: .3px;
+  padding: 10px 14px; text-align: center;
+  border-bottom: 1px solid rgba(0,0,0,.25);
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.12);
+}
+.ticket-body { padding: 8px 14px; flex: 1; }
+.item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+.item:last-child { border-bottom: none; }
+.item[data-item] { cursor: pointer; user-select: none; }
+/* Món đã tick xong: mờ đi + gạch ngang tên */
+.item.done { opacity: .45; }
+.item.done .name { text-decoration: line-through; }
+.item .check {
+  min-width: 30px; height: 30px; align-self: center;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--line); border-radius: 8px;
+  font-size: 18px; font-weight: 900; color: var(--green);
+}
+.item.done .check { border-color: var(--green); background: rgba(34,197,94,.15); }
+/* Check chỉ-đọc ở màn Expo (không bấm được, chỉ báo trạng thái) */
+.item .check.ro { border-style: dashed; }
+.item.done .check.ro { border-style: solid; }
+/* Expo — món bếp đã nấu xong (done) mà CHƯA chạy ra bàn (chưa served) -> NHẤP
+   NHÁY xanh cho người chạy bàn thấy mà bê ra. Chạm 1 cái = đã ra bàn -> class
+   .served -> hết nháy, mờ + gạch ngang (rơi về .item.done mặc định). Bếp untick
+   thì hết done -> hết nháy. Vé chỉ đóng bằng nút Thanh toán (không có Served). */
+.st-expo .item.done:not(.served):not(.voided) {
+  opacity: 1;
+  border-radius: 8px;
+  box-shadow: inset 4px 0 0 var(--green);
+  animation: pickup 1s ease-in-out infinite;
+  cursor: pointer;
+}
+.st-expo .item.done:not(.served):not(.voided) .name,
+.st-expo .item.done:not(.served):not(.voided) .price { text-decoration: none; }
+@keyframes pickup {
+  0%, 100% { background: rgba(34,197,94,.10); }
+  50%      { background: rgba(34,197,94,.34); }
+}
+/* Chip trạm bếp hiện trên màn Expo */
+.stn {
+  display: inline-block; margin-top: 4px; font-size: 11px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .5px; padding: 2px 8px; border-radius: 6px;
+  background: var(--panel); color: var(--muted);
+}
+.stn-larder { background: rgba(20,184,166,.18); color: var(--deliver); }
+.stn-pan    { background: rgba(245,158,11,.18); color: var(--amber); }
+.stn-grill  { background: rgba(239,68,68,.18);  color: var(--red); }
+/* Nút Served (Expo) — chỉ bấm được khi cả đơn đã xong */
+.bump.serve { background: var(--green); }
+.bump.serve:disabled { background: var(--line); color: var(--muted); cursor: default; animation: none; }
+/* Expo bấm Served khi bếp CHƯA tick hết: vẫn bấm được (Expo quyền cao nhất),
+   nhưng để kiểu viền cho khác nút xanh đầy "đã sẵn sàng". */
+.bump.serve.early { background: transparent; color: var(--green); box-shadow: inset 0 0 0 2px var(--green); }
+/* Cả đơn đã xong hết -> viền xanh báo sẵn sàng bấm "Xong" */
+.ticket.alldone { border-color: var(--green); box-shadow: 0 0 0 1px var(--green) inset; }
+.ticket.alldone .bump.kitchen { animation: readyglow 1.4s ease-in-out infinite; }
+@keyframes readyglow { 0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); } 50% { box-shadow: 0 0 0 4px rgba(34,197,94,.5); } }
+
+/* Lời nhắc bật âm báo (nổi dưới đáy màn) */
+.sound-prompt {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%) translateY(20px);
+  background: var(--accent); color: #fff; font-size: 15px; font-weight: 700;
+  padding: 12px 20px; border-radius: 999px; box-shadow: 0 6px 20px rgba(0,0,0,.4);
+  opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s; z-index: 50;
+}
+.sound-prompt.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.item .qty {
+  min-width: 34px; height: 30px; padding: 0 6px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--panel); border-radius: 7px;
+  font-weight: 800; font-size: 16px; color: var(--accent);
+}
+.item .detail { flex: 1; }
+.item .name { font-size: 17px; font-weight: 600; line-height: 1.25; }
+.item .variation { font-size: 13px; color: var(--muted); }
+.item .mods { margin-top: 3px; }
+.item .mod {
+  display: inline-block; font-size: 13px; color: var(--amber);
+  margin-right: 8px;
+}
+.item .note {
+  margin-top: 4px; font-size: 14px; font-weight: 600; color: #fde68a;
+  background: rgba(245,158,11,.12); padding: 3px 8px; border-radius: 6px;
+  display: inline-block;
+}
+
+/* ---- Giá từng món (cột phải, chung chỗ với ô tick) ------------------ */
+.item .side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.item .price {
+  font-size: 15px; font-weight: 700; color: var(--muted);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.item.done .price { text-decoration: line-through; }
+
+/* ---- Đơn / món bị huỷ trên Square ----------------------------------
+   Vé KHÔNG được tự bay mất: món có thể đã nấu xong rồi, bếp phải thấy mà
+   dừng tay. Đỏ đập vào mắt, bấm Acknowledge mới dọn. */
+.ticket.cancelled { border-color: var(--red); box-shadow: 0 0 0 2px var(--red) inset; }
+.ticket.hasvoid   { border-color: var(--red); }
+.cancel-banner {
+  background: var(--red); color: #fff; font-weight: 800; letter-spacing: .4px;
+  padding: 9px 14px; font-size: 15px; text-align: center;
+  animation: pulse 1.2s infinite;
+}
+.item.voided .name  { text-decoration: line-through; color: var(--red); }
+.item.voided .price { text-decoration: line-through; opacity: .6; }
+.item.voided .check { visibility: hidden; }
+.void-tag {
+  display: inline-block; margin: 3px 0; padding: 2px 8px; border-radius: 6px;
+  background: var(--red); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: .3px;
+}
+.bump.ack { background: var(--red); color: #fff; }
+
+/* Món khách gọi thêm vào vé đang có: phải đập vào mắt, kẻo bếp chỉ nhìn lướt
+   vé cũ rồi bỏ sót. Nhãn tắt ngay khi bếp tick xong món. */
+.item.justadded { background: rgba(250,204,21,.10); box-shadow: inset 3px 0 0 var(--amber, #facc15); }
+.add-tag {
+  display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 6px;
+  background: #facc15; color: #3a2c00; font-size: 11px; font-weight: 800; letter-spacing: .4px;
+  vertical-align: middle;
+}
+/* Đã thu tiền nhưng chưa chạy món ra — vé ở lại màn cho tới khi bấm Served. */
+.badge.paid { background: rgba(34,197,94,.18); color: #22c55e; }
+
+.ticket-foot { padding: 12px 14px; border-top: 1px solid var(--line); display: flex; gap: 10px; }
+.bump {
+  flex: 1; border: none; border-radius: 10px; padding: 16px;
+  font-size: 18px; font-weight: 800; cursor: pointer; color: #04120a;
+  transition: transform .08s;
+}
+.bump:active { transform: scale(.97); }
+.bump.kitchen { background: var(--amber); }
+.bump.expo    { background: var(--green); }
+.undo {
+  border: 1px solid var(--line); background: transparent; color: var(--muted);
+  border-radius: 10px; padding: 0 16px; font-size: 15px; cursor: pointer;
+}
+
+/* ---- Landing page -------------------------------------------------- */
+.landing { max-width: 760px; margin: 0 auto; padding: 40px 20px; }
+.landing h1 { font-size: 30px; margin-bottom: 6px; }
+.landing .sub { color: var(--muted); margin-bottom: 28px; }
+.stations { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
+.station-card {
+  display: block; text-decoration: none; color: var(--text);
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  padding: 24px; transition: border-color .2s;
+}
+.station-card:hover { border-color: var(--accent); }
+.station-card .ic { font-size: 34px; }
+.station-card h2 { font-size: 22px; margin: 8px 0 4px; }
+.station-card p { color: var(--muted); font-size: 14px; }
+.panel {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 14px; padding: 20px; margin-bottom: 16px;
+}
+.panel h3 { font-size: 16px; margin-bottom: 12px; }
+.btn {
+  background: var(--accent); color: #fff; border: none; border-radius: 10px;
+  padding: 12px 20px; font-size: 15px; font-weight: 700; cursor: pointer;
+}
+.btn:active { transform: scale(.98); }
+.note { font-size: 13px; color: var(--muted); line-height: 1.6; }
+code { background: var(--card); padding: 2px 6px; border-radius: 5px; font-size: 13px; }
+
+@media (max-width: 560px) {
+  .stations { grid-template-columns: 1fr; }
+}
+
+/* ---- Thanh toán ngay trên Expo ------------------------------------- */
+.bump.pay { background: #e0a82e; color: #1a1205; }
+
+.pay-modal { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; }
+.pay-modal[hidden] { display: none; }
+.pay-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.62); }
+.pay-card {
+  position: relative; width: min(92vw, 420px); max-height: 92vh; overflow: auto;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+  padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,.5);
+}
+.pay-x { position: absolute; top: 10px; right: 14px; background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; }
+.pay-h { font-size: 20px; font-weight: 800; color: var(--text); padding-right: 28px; }
+.pay-due { margin-top: 4px; font-size: 17px; color: var(--text); }
+
+.pay-stage { margin-top: 18px; }
+.pay-opt { display: block; width: 100%; margin-top: 12px; padding: 20px; border: none; border-radius: 12px; font-size: 19px; font-weight: 800; cursor: pointer; }
+.pay-opt.cash { background: #e0a82e; color: #1a1205; }
+.pay-opt.card { background: var(--accent); color: #fff; }
+
+.pay-lab { color: var(--muted); font-size: 14px; }
+.pay-amt { font-size: 40px; font-weight: 800; color: var(--text); margin: 4px 0; }
+.pay-info { min-height: 22px; font-size: 16px; font-weight: 700; }
+.pay-info.short { color: var(--red); }
+.pay-info.change { color: var(--green); }
+
+.pay-quick { display: flex; gap: 8px; margin: 10px 0; }
+.pay-quick button { flex: 1; padding: 12px; border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; }
+
+.pay-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 6px; }
+.pay-keys button { padding: 18px 0; font-size: 22px; font-weight: 700; background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
+.pay-keys button:active { transform: scale(.96); }
+
+.pay-confirm { width: 100%; margin-top: 14px; padding: 18px; border: none; border-radius: 12px; background: var(--green); color: #04120a; font-size: 18px; font-weight: 800; cursor: pointer; }
+.pay-confirm:disabled { background: var(--line); color: var(--muted); cursor: default; }
+.pay-back { width: 100%; margin-top: 10px; padding: 12px; background: none; border: none; color: var(--muted); font-size: 15px; cursor: pointer; }
+
+.pay-state { padding: 24px; text-align: center; border-radius: 12px; font-size: 18px; font-weight: 700; background: var(--card); color: var(--text); }
+.pay-state.wait { background: rgba(245,158,11,.15); color: var(--amber); }
+.pay-state.done { background: rgba(34,197,94,.15); color: var(--green); }
+
+.pay-err { margin-top: 12px; padding: 12px; border-radius: 10px; background: rgba(239,68,68,.15); color: var(--red); font-size: 14px; text-align: center; }
+.pay-err[hidden] { display: none; }
+
+/* Tên + SĐT khách (đơn QR) trên vé — nhân viên biết ai ngồi bàn */
+.cust { padding: 4px 14px 2px; font-size: 15px; font-weight: 600; color: var(--text); }
+.cust .ph { color: var(--muted); font-weight: 500; }
+
+/* Bảng thống kê cuối ngày ở màn History (số đơn + số lượng mỗi món bán ra) */
+.hist-summary { padding: 0 14px; margin: 4px 0 14px; }
+.hist-summary:empty { display: none; }
+.sum-head {
+  display: flex; gap: 24px; flex-wrap: wrap; align-items: baseline;
+  padding: 12px 16px; background: var(--card); border: 1px solid var(--line);
+  border-radius: 12px 12px 0 0; border-bottom: none;
+}
+.sum-stat { color: var(--muted); font-size: 15px; }
+.sum-stat b { color: var(--text); font-size: 24px; margin-right: 4px; }
+.sum-items {
+  background: var(--card); border: 1px solid var(--line); border-radius: 0 0 12px 12px;
+  padding: 6px 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 2px 18px;
+}
+.sum-row {
+  display: flex; align-items: baseline; gap: 10px; padding: 5px 8px;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.sum-q { color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; min-width: 34px; }
+.sum-n { color: var(--text); }
+
+/* Màu docket theo loại đơn (Saigon): Takeaway = ĐỎ, Dine-in = XANH LÁ.
+   Viền trái đậm + tô nhẹ header; đơn huỷ/void vẫn giữ cảnh báo riêng. */
+.ticket.t-takeaway { border-left: 6px solid var(--red); }
+.ticket.t-dine_in  { border-left: 6px solid var(--green); }
+.ticket.t-takeaway:not(.cancelled):not(.hasvoid) .ticket-head { background: rgba(239,68,68,.10); }
+.ticket.t-dine_in:not(.cancelled):not(.hasvoid) .ticket-head  { background: rgba(34,197,94,.10); }

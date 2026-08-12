@@ -1,0 +1,35 @@
+{
+  "_note": "Menu Délice để nhập vào Square. Mỗi món gắn 2 category: section (mục menu cho khách) + station (trạm bếp cho KDS: Larder/Pan/Grill).",
+  "currency": "AUD",
+  "items": [
+    { "name": "Soft Egg Scotch",                  "price": 18, "section": "Small Plates",          "station": "Grill"  },
+    { "name": "Pani Puri, Pan-Seared Scallop",    "price": 24, "section": "Small Plates",          "station": "Larder" },
+    { "name": "Mini Beef Wellington",             "price": 26, "section": "Small Plates",          "station": "Pan"    },
+    { "name": "Steak Tartare",                    "price": 24, "section": "Small Plates",          "station": "Larder" },
+    { "name": "Cheeseburger Spring Rolls",        "price": 24, "section": "Small Plates",          "station": "Grill"  },
+    { "name": "Garlic Gai Lan",                   "price": 24, "section": "Small Plates",          "station": "Pan"    },
+
+    { "name": "Chargrilled Steak",                "price": 38, "section": "Larger Plates",         "station": "Grill"  },
+    { "name": "Crispy Skin Salmon",               "price": 34, "section": "Larger Plates",         "station": "Pan"    },
+    { "name": "Wok-Seared Shaking Beef",          "price": 36, "section": "Larger Plates",         "station": "Pan"    },
+
+    { "name": "Combination Pho",                  "price": 18, "section": "Signature Vietnamese",  "station": "Larder" },
+    { "name": "Short Rib Pho",                    "price": 24, "section": "Signature Vietnamese",  "station": "Larder" },
+    { "name": "Crispy Chicken Pho",               "price": 26, "section": "Signature Vietnamese",  "station": "Grill"  },
+    { "name": "Mix Grilled Pork Vermicelli",      "price": 18, "section": "Signature Vietnamese",  "station": "Grill"  },
+    { "name": "Special Pork Chop Rice",           "price": 26, "section": "Signature Vietnamese",  "station": "Grill"  },
+    { "name": "Crispy Chicken Dry Noodles",       "price": 18, "section": "Signature Vietnamese",  "station": "Grill"  },
+    { "name": "Spicy Garlic Prawn Fried Rice",    "price": 24, "section": "Signature Vietnamese",  "station": "Pan"    },
+    { "name": "Lemongrass Chicken Vermicelli Salad", "price": 26, "section": "Signature Vietnamese", "station": "Grill" },
+    { "name": "Vegan Glass Noodles",              "price": 26, "section": "Signature Vietnamese",  "station": "Pan"    },
+    { "name": "Vegan Vermicelli Salad",           "price": 26, "section": "Signature Vietnamese",  "station": "Grill"  },
+
+    { "name": "Grilled Pork Banh Mi Kit",         "price": 18, "section": "Fusion",                "station": "Grill"  },
+    { "name": "Saigon Glass Noodles",             "price": 24, "section": "Fusion",                "station": "Pan"    },
+    { "name": "Bo Kho Braised Beef Pasta",        "price": 26, "section": "Fusion",                "station": "Pan"    },
+    { "name": "Bun Bo Hue Udon",                  "price": 18, "section": "Fusion",                "station": "Grill"  }
+  ],
+  "_removed_pending": [
+    "Dessert — mục DESSERT trong menu in nhầm thành Phở, chủ bổ sung sau"
+  ]
+}

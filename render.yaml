@@ -1,0 +1,19 @@
+# Cấu hình deploy Render (Blueprint) cho Saigon Spices KDS.
+# Chỉ có service màn bếp (KDS). App QR order (saigon-order) sẽ thêm sau.
+services:
+  - type: web
+    name: saigon-kds
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /
+    envVars:
+      # Token Square của Saigon Spices: đặt trong Render Dashboard (KHÔNG ghi vào file này).
+      # Token + env phải ĐỒNG BỘ CẶP: sandbox-token+sandbox, hoặc production-token+production.
+      - key: SQUARE_ACCESS_TOKEN
+        sync: false
+      - key: SQUARE_ENV
+        value: sandbox
+      # Terminal (nút Card trên Expo) — lấy sau khi ghép máy Square Terminal.
+      - key: SQUARE_DEVICE_ID
+        sync: false

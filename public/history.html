@@ -1,0 +1,171 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="History">
+<meta name="theme-color" content="#0d1117">
+<title>KDS — History</title>
+<link rel="stylesheet" href="/kds.css">
+<div class="bar">
+  <h1>SAIGON SPICES</h1>
+  <span class="station-tag hist">History · Today</span>
+  <a class="backlink" id="back" href="/kitchen">← Back</a>
+  <span class="spacer"></span>
+  <span class="count" id="count">…</span>
+  <span class="clock" id="clock">--:--</span>
+  <button class="sound-btn" id="refresh">↻ Refresh</button>
+</div>
+<div class="hist-summary" id="summary"></div>
+<div class="grid" id="grid"></div>
+<script>
+(function () {
+  const grid = document.getElementById("grid");
+  const countEl = document.getElementById("count");
+  const clockEl = document.getElementById("clock");
+  const back = document.getElementById("back");
+
+  // Nút Back quay về đúng màn vừa tới (kitchen hay expo) — nhớ qua localStorage.
+  const from = localStorage.getItem("kds_hist_from") || "kitchen";
+  back.href = "/" + from;
+  back.textContent = "← Back to " + (from === "expo" ? "Expo" : "Kitchen");
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function money(m) {
+    if (!m || m.amount == null) return "";
+    try {
+      return new Intl.NumberFormat("en-AU", { style: "currency", currency: m.currency || "AUD" })
+        .format(m.amount / 100);
+    } catch (_) { return "$" + (m.amount / 100).toFixed(2); }
+  }
+  function hhmm(ms) {
+    if (!ms) return "—";
+    return new Date(ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  }
+  function typeLabel(t) {
+    return { DINE_IN: "Dine-in", TAKEAWAY: "Takeaway", DELIVERY: "Delivery",
+             UNKNOWN: "No table" }[t] || t;
+  }
+  function whereLabel(t) {
+    if (t.table) return t.type === "DINE_IN" ? "Table " + t.table : t.table;
+    if (t.guest) return t.guest;
+    return typeLabel(t.type);
+  }
+
+  function tickClock() {
+    clockEl.textContent = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  }
+  setInterval(tickClock, 1000); tickClock();
+
+  // Bảng thống kê cuối ngày: tổng số đơn ĐÃ PHỤC VỤ + mỗi món bán bao nhiêu cái.
+  // Chỉ tính đơn Served (đơn huỷ không tính là đã bán).
+  function renderSummary(orders) {
+    const summaryEl = document.getElementById("summary");
+    const served = orders.filter(t => t.state !== "CANCELLED");
+    const counts = {};
+    served.forEach(t => (t.items || []).forEach(it => {
+      const n = it.name || "—";
+      counts[n] = (counts[n] || 0) + (Number(it.qty) || 1);
+    }));
+    const rows = Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    const totalItems = rows.reduce((s, r) => s + r[1], 0);
+    if (!served.length) { summaryEl.innerHTML = ""; return; }
+    summaryEl.innerHTML = `
+      <div class="sum-head">
+        <span class="sum-stat"><b>${served.length}</b> orders served</span>
+        <span class="sum-stat"><b>${totalItems}</b> items sold</span>
+      </div>
+      <div class="sum-items">
+        ${rows.map(([name, q]) => `
+          <div class="sum-row"><span class="sum-q">${q}×</span><span class="sum-n">${esc(name)}</span></div>
+        `).join("")}
+      </div>`;
+  }
+
+  function render(orders) {
+    countEl.textContent = orders.length + (orders.length === 1 ? " order today" : " orders today");
+    renderSummary(orders);
+    if (!orders.length) {
+      grid.innerHTML = `<div class="empty">No finished or cancelled orders today yet.</div>`;
+      return;
+    }
+    grid.innerHTML = orders.map(t => {
+      const cancelled = t.state === "CANCELLED";
+      const items = (t.items || []).map(it => `
+        <div class="item ${cancelled ? "voided" : ""}">
+          <div class="qty">${it.qty}×</div>
+          <div class="detail">
+            <div class="name">${esc(it.name)}</div>
+            ${it.variation ? `<div class="variation">${esc(it.variation)}</div>` : ""}
+            ${it.modifiers && it.modifiers.length
+              ? `<div class="mods">${it.modifiers.map(m => `<span class="mod">+ ${esc(m)}</span>`).join("")}</div>` : ""}
+            ${it.note ? `<div class="note">📝 ${esc(it.note)}</div>` : ""}
+            ${it.station ? `<span class="stn stn-${esc((it.station || "").toLowerCase())}">${esc(it.station)}</span>` : ""}
+          </div>
+          <div class="side">
+            ${it.price ? `<div class="price">${esc(money(it.price))}</div>` : ""}
+            <button class="item-redo" data-redo-item="${esc(it.uid)}">↻ Redo</button>
+          </div>
+        </div>`).join("");
+      return `
+        <div class="ticket hist-card ${cancelled ? "hasvoid" : ""}" data-hist="${esc(t.hist_id)}">
+          <div class="ticket-head">
+            <span class="badge ${cancelled ? "CANCELLED" : "SERVED"}">${cancelled ? "Cancelled" : "Served"}</span>
+            ${t.type === "DINE_IN" ? "" : `<span class="badge ${t.type}">${typeLabel(t.type)}</span>`}
+            <span class="where">${esc(whereLabel(t))}</span>
+          </div>
+          ${t.order_note ? `<div class="order-note">⚠ ${esc(t.order_note)}</div>` : ""}
+          <div class="ticket-body">${items}</div>
+          <div class="hist-times">
+            <span>Placed ${hhmm(t.received_at)}</span>
+            <span>${cancelled ? "Cancelled" : "Served"} ${hhmm(t.closed_at)}</span>
+          </div>
+        </div>`;
+    }).join("");
+  }
+
+  // Redo TỪNG MÓN: đẩy riêng món bị làm sai quay lại màn bếp (không tính tiền lại).
+  grid.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-redo-item]");
+    if (!btn) return;
+    const uid = btn.dataset.redoItem;
+    const hid = btn.closest(".hist-card")?.dataset.hist;
+    if (!hid) return;
+    btn.disabled = true;
+    const label = btn.textContent;
+    btn.textContent = "Sending…";
+    try {
+      const r = await fetch(`/api/history/${hid}/redo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid }),
+      });
+      const d = await r.json();
+      if (d.ok) { btn.classList.add("sent"); btn.textContent = d.message ? "✓ Sent to " + d.message : "✓ Sent to kitchen"; }
+      else { btn.disabled = false; btn.textContent = "↻ Try again"; alert(d.message || "Redo failed"); }
+    } catch (_) {
+      btn.disabled = false; btn.textContent = label;
+    }
+  });
+
+  async function load() {
+    countEl.textContent = "loading…";
+    try {
+      const r = await fetch("/api/history", { cache: "no-store" });
+      const d = await r.json();
+      if (!d.ok) { grid.innerHTML = `<div class="empty">${esc(d.message || "Could not load history")}</div>`;
+                   countEl.textContent = "—"; return; }
+      render(d.orders || []);
+    } catch (e) {
+      grid.innerHTML = `<div class="empty">Network error — tap Refresh.</div>`;
+      countEl.textContent = "—";
+    }
+  }
+  document.getElementById("refresh").addEventListener("click", load);
+  load();
+  // Tự làm mới nhẹ mỗi 60s khi đang mở (đơn mới đóng sẽ hiện dần).
+  setInterval(load, 60000);
+})();
+</script>

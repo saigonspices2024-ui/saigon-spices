@@ -1,0 +1,86 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connect Square — Saigon Spices KDS</title>
+<link rel="stylesheet" href="/kds.css">
+<div class="landing">
+  <h1>Connect Square</h1>
+  <p class="sub">Paste an Access Token so the KDS receives live orders from Square.</p>
+
+  <div class="panel">
+    <h3>Status</h3>
+    <p id="status" class="note">Checking…</p>
+  </div>
+
+  <div class="panel">
+    <h3>Paste Access Token</h3>
+    <p class="note" style="margin-bottom:12px">
+      On the Square <b>Credentials</b> page, pick the <b>Sandbox</b> or <b>Production</b>
+      tab, reveal/copy the <b>Access token</b>, then paste it below. The token is stored
+      locally on this machine (<code>kds/.env</code>) and is not sent anywhere else.
+    </p>
+    <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px">
+      <label class="note"><input type="radio" name="env" value="sandbox" checked> Sandbox</label>
+      <label class="note"><input type="radio" name="env" value="production"> Production (live)</label>
+    </div>
+    <input id="token" type="password" placeholder="Paste Access Token here"
+      autocomplete="off" spellcheck="false"
+      style="width:100%; padding:12px 14px; font-size:15px; background:var(--card);
+             border:1px solid var(--line); border-radius:10px; color:var(--text); margin-bottom:12px">
+    <button class="btn" id="saveBtn">Connect & Test</button>
+    <span id="msg" class="note" style="margin-left:12px"></span>
+  </div>
+
+  <div class="panel">
+    <h3>After connecting</h3>
+    <p class="note">
+      The KDS polls Square every few seconds and shows OPEN orders on the
+      <a href="/kitchen" target="_blank" style="color:var(--accent)">Kitchen screen</a>.
+      Create a test order in Square to watch it flow in here.
+    </p>
+  </div>
+</div>
+
+<script>
+  const statusEl = document.getElementById("status");
+  const msg = document.getElementById("msg");
+  const btn = document.getElementById("saveBtn");
+
+  async function refreshStatus() {
+    try {
+      const r = await fetch("/api/square-status");
+      const s = await r.json();
+      if (!s.configured) {
+        statusEl.textContent = "⚪ No token configured.";
+      } else if (s.connected) {
+        statusEl.textContent = `🟢 Connected (${s.env}). Location: ${(s.locations || []).join(", ") || "—"}`;
+      } else {
+        statusEl.textContent = `🔴 Token set but not connected: ${s.error || ""}`;
+      }
+    } catch (e) {
+      statusEl.textContent = "Could not read status.";
+    }
+  }
+  refreshStatus();
+  setInterval(refreshStatus, 4000);
+
+  btn.addEventListener("click", async () => {
+    const token = document.getElementById("token").value.trim();
+    const env = document.querySelector('input[name="env"]:checked').value;
+    if (!token) { msg.textContent = "No token entered"; return; }
+    btn.disabled = true; msg.textContent = "Testing…";
+    try {
+      const r = await fetch("/api/setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, env }),
+      });
+      const res = await r.json();
+      msg.textContent = (res.ok ? "✓ " : "✗ ") + (res.message || "");
+      if (res.ok) document.getElementById("token").value = "";
+    } catch (e) {
+      msg.textContent = "Error: " + e.message;
+    }
+    btn.disabled = false;
+    refreshStatus();
+  });
+</script>

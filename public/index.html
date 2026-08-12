@@ -1,0 +1,89 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saigon Spices KDS</title>
+<link rel="stylesheet" href="/kds.css">
+<div class="landing">
+  <h1>Saigon Spices KDS</h1>
+  <p class="sub">Kitchen display system connected to Square — pick a station per screen, then Expo.</p>
+
+  <div class="stations">
+    <a class="station-card" href="/kitchen" target="_blank">
+      <div class="ic">👨‍🍳</div>
+      <h2>Kitchen screen</h2>
+      <p>Open on each station tablet, pick its station from the dropdown (Larder / Pan / Grill, or All). It remembers per device. Tap each dish when ready.</p>
+    </a>
+    <a class="station-card" href="/expo" target="_blank">
+      <div class="ic">🍽️</div>
+      <h2>Expo</h2>
+      <p>All dishes for every table with per-station progress; when all done, tap “Served”.</p>
+    </a>
+  </div>
+
+  <div class="panel">
+    <h3>Demo — simulate a Square order</h3>
+    <p class="note" style="margin-bottom:12px">
+      Tap a button below to create a sample order (real Square Order format). Open the two
+      screens above side by side to watch it flow: Kitchen → tap Done → moves to Expo → tap Served.
+    </p>
+    <button class="btn" id="simBtn">➕ Create sample order (local)</button>
+    <button class="btn" id="sqBtn" style="background:#22c55e; margin-left:8px">🟩 Create a REAL order in Square</button>
+    <span id="simMsg" class="note" style="margin-left:12px"></span>
+  </div>
+
+  <div class="panel">
+    <h3>Square connection</h3>
+    <p class="note" id="sqStatus">Checking…</p>
+    <a class="note" href="/setup" style="color:var(--accent)">→ Connection / paste token page</a>
+  </div>
+
+  <div class="panel">
+    <h3>Live Square webhook (Phase 2)</h3>
+    <p class="note">
+      Real-order webhook endpoint: <code>POST /webhooks/square</code>.
+      Register the <code>order.created</code>, <code>order.updated</code>,
+      <code>order.fulfillment.updated</code> events in the Square Developer Dashboard
+      and point them here. Data is parsed as a Square Order object, so no UI change is needed.
+    </p>
+  </div>
+</div>
+
+<script>
+  const btn = document.getElementById("simBtn");
+  const sqBtn = document.getElementById("sqBtn");
+  const msg = document.getElementById("simMsg");
+
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    try {
+      await fetch("/api/sim", { method: "POST" });
+      msg.textContent = "✓ Local order created — check the Kitchen screen";
+    } catch (e) {
+      msg.textContent = "Error: " + e.message;
+    }
+    setTimeout(() => { btn.disabled = false; msg.textContent = ""; }, 1500);
+  });
+
+  sqBtn.addEventListener("click", async () => {
+    sqBtn.disabled = true;
+    msg.textContent = "Creating order in Square…";
+    try {
+      const r = await fetch("/api/sim-square", { method: "POST" });
+      const res = await r.json();
+      msg.textContent = (res.ok ? "✓ " : "✗ ") + (res.message || "");
+    } catch (e) {
+      msg.textContent = "Error: " + e.message;
+    }
+    setTimeout(() => { sqBtn.disabled = false; msg.textContent = ""; }, 2500);
+  });
+
+  async function sqStatus() {
+    try {
+      const s = await (await fetch("/api/square-status")).json();
+      const el = document.getElementById("sqStatus");
+      if (!s.configured) el.textContent = "⚪ Square not connected.";
+      else if (s.connected) el.textContent = `🟢 Connected (${s.env}) — ${(s.locations||[]).join(", ")}`;
+      else el.textContent = `🔴 Not connected: ${s.error||""}`;
+    } catch (e) {}
+  }
+  sqStatus(); setInterval(sqStatus, 5000);
+</script>
