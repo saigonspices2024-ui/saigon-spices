@@ -667,17 +667,16 @@ def ack_cancel(ticket_id, station=None):
 
 
 def bump(ticket_id, station):
-    """Đẩy đơn sang trạng thái kế tiếp theo trạm bấm."""
-    if HOLD_TILL_DONE and station == "kitchen":
-        # ⭐ COUNTER-SERVICE (Saigon): bếp bấm "Done" = nấu xong -> giao hết món +
-        # hoàn tất, GỠ khỏi màn luôn (1 bếp, không có bước Expo; tiền đã thu ở POS).
-        return serve(ticket_id)
+    """Đẩy đơn sang trạng thái kế tiếp theo trạm bấm. Bếp 'Done' -> READY = ĐẨY đơn
+    sang màn Expo (KHÔNG gỡ — Expo còn chạy món ra cho khách rồi mới tắt). Counter-
+    service (Saigon): KDS chỉ ĐỌC, KHÔNG ghi ngược Square (POS lo vòng đời đơn)."""
     write_back = None  # (order_id, target_fulfillment_state)
     with _lock:
         t = _tickets.get(ticket_id)
         if not t:
             return False
-        is_square = t.get("origin") == "square"
+        # HOLD_TILL_DONE (Saigon read-only): không ghi ngược Square.
+        is_square = t.get("origin") == "square" and not HOLD_TILL_DONE
         if station == "kitchen" and t["state"] == "NEW":
             t["state"] = "READY"
             t["ready_at"] = _now_ms()

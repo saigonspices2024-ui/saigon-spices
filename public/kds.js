@@ -374,10 +374,10 @@
       // Expo để chạy món + thu tiền. Bump sang READY, KHÔNG đóng bill (tiền vẫn thu
       // ở Expo) -> an toàn kể cả đơn QR chưa trả. Giữ Acknowledge cho đơn bị huỷ.
       const kitchenDone = STATION === "kitchen" && !activeStation && allDone && !voided;
-      // Expo: nút "✓ Served" = đã giao HẾT món ra bàn. Chỉ hiện khi bếp đã nấu
-      // xong hết (allDone) mà chưa giao hết. Bấm KHÔNG làm mất vé ngay — đơn chỉ
-      // rời màn khi ĐÃ TRẢ TIỀN + ĐÃ GIAO HẾT (xem maybe_complete ở server).
-      const expoServed = HAS_SERVE && !voided && allDone && !allServed;
+      // Expo: nút "✓ Served" = đã chạy món ra cho khách -> tắt đơn (finalize, gỡ
+      // khỏi màn). Counter-service: Expo là QUYỀN CAO NHẤT, tắt được BẤT CỨ LÚC NÀO
+      // (không cần bếp tick hết). Bếp chưa xong thì nút để kiểu viền (early) nhắc.
+      const expoServed = HAS_SERVE && !voided && !allServed;
       let footBtn = "";
       if (voided) {
         footBtn = `<button class="bump ack" data-ack="${t.id}">Acknowledge</button>`;
