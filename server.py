@@ -43,6 +43,17 @@ _pending_vanish = set()  # đơn vừa rời danh sách OPEN, đang hỏi Square
 # thêm lại vé -> vé "nhấp nháy" hiện lại rồi mới mất. Khoá id ở đây để poll bỏ qua.
 _recently_closed = {}    # order_id -> timestamp
 _CLOSED_GRACE_S = 25
+
+# ⭐ COUNTER-SERVICE (Saigon Spices): khách trả tiền TẠI QUẦY/POS TRƯỚC rồi bếp mới
+# nấu. KDS là hàng đợi nấu ăn, đơn phải NẰM LẠI tới khi bếp bấm "Done", BẤT KỂ đã
+# trả tiền hay chưa. (Model Délice là dine-in: trả cuối bữa, đơn rời màn khi trả +
+# giao hết — không hợp Saigon: đơn trả xong ở POS là Square đóng -> KDS xoá luôn.)
+# Bật mặc định; tắt bằng env KDS_HOLD_TILL_DONE=0 nếu muốn về model dine-in.
+HOLD_TILL_DONE = os.environ.get("KDS_HOLD_TILL_DONE", "1").strip().lower() not in ("0", "false", "no", "off", "")
+# Đơn ĐÃ BẤM DONE (bếp nấu xong): chặn BỀN, đừng để poll thêm lại dù Square còn
+# báo OPEN (đơn chưa trả ở POS vẫn OPEN). order_id -> timestamp, dọn sau TTL.
+_done_ids = {}
+_DONE_TTL_S = 12 * 3600
 # Vé chính vừa được GỘP thêm món của vé phụ (lúc thu chung bằng thẻ): poll kế tiếp
 # sẽ thấy món lạ nhảy vào -> ĐỪNG kêu chuông "gọi thêm", đồ đã ra bàn rồi. Đánh
 # dấu id vé chính tới hạn này để _merge_items bỏ qua cờ added.
@@ -545,6 +556,8 @@ def sync_from_square_orders(orders):
     with _lock:
         for k in [k for k, v in _recently_closed.items() if now - v > _CLOSED_GRACE_S]:
             del _recently_closed[k]
+        for k in [k for k, v in _done_ids.items() if now - v > _DONE_TTL_S]:
+            del _done_ids[k]
     for o in orders:
         # bỏ qua đơn không có món (chưa lên đơn xong)
         if not o.get("line_items"):
@@ -554,6 +567,9 @@ def sync_from_square_orders(orders):
         with _lock:
             # Vé vừa đóng bằng nút Thanh toán: đừng thêm lại dù Square còn báo OPEN.
             if t["id"] in _recently_closed:
+                continue
+            # Đơn đã BẤM DONE (counter-service): chặn bền, đừng thêm lại dù còn OPEN.
+            if t["id"] in _done_ids:
                 continue
             open_ids.add(t["id"])
             existing = _tickets.get(t["id"])
@@ -574,6 +590,7 @@ def sync_from_square_orders(orders):
         vanished = [k for k, v in _tickets.items()
                     if v.get("origin") == "square" and k not in open_ids
                     and v.get("state") != "CANCELLED" and not v.get("paid")
+                    and not v.get("square_closed")   # đã hỏi Square + GIỮ lại (counter-service)
                     and k not in _pending_vanish]
         _pending_vanish.update(vanished)
     if vanished:
@@ -606,11 +623,17 @@ def _resolve_vanished(ids):
                 t["state"] = "CANCELLED"
                 t["cancelled_at"] = _now_ms()
                 print(f"[KDS] order {tid} cancelled on Square -> alert kitchen", flush=True)
+            elif HOLD_TILL_DONE:
+                # ⭐ COUNTER-SERVICE (Saigon): đơn rời OPEN = đã TRẢ TIỀN ở POS. KHÔNG
+                # xoá — bếp còn phải nấu. GIỮ lại tới khi bấm Done; đánh dấu paid +
+                # square_closed để poll không hỏi lại đơn này nữa (khỏi lặp retrieve).
+                t["paid"] = True
+                t["square_closed"] = True
+                cur = (t.get("due") or {}).get("currency", "AUD")
+                t["due"] = {"amount": 0, "currency": cur}
             else:
-                # Đơn rời danh sách OPEN mà không phải mới-huỷ = đã trả/đóng nơi
-                # khác (POS thu tiền xong, hoặc chính Expo vừa bấm Thanh toán).
-                # Gỡ khỏi màn. (Đơn QR trả qua nút Thanh toán đã tự đóng + ghi
-                # History rồi; giờ KHÔNG còn nút Served nên không giữ vé "PAID".)
+                # Model dine-in (Délice): đơn rời OPEN mà không phải mới-huỷ = đã trả/
+                # đóng nơi khác (POS thu xong / Expo bấm Thanh toán) -> gỡ khỏi màn.
                 del _tickets[tid]
     broadcast()
 
@@ -645,6 +668,10 @@ def ack_cancel(ticket_id, station=None):
 
 def bump(ticket_id, station):
     """Đẩy đơn sang trạng thái kế tiếp theo trạm bấm."""
+    if HOLD_TILL_DONE and station == "kitchen":
+        # ⭐ COUNTER-SERVICE (Saigon): bếp bấm "Done" = nấu xong -> giao hết món +
+        # hoàn tất, GỠ khỏi màn luôn (1 bếp, không có bước Expo; tiền đã thu ở POS).
+        return serve(ticket_id)
     write_back = None  # (order_id, target_fulfillment_state)
     with _lock:
         t = _tickets.get(ticket_id)
@@ -766,8 +793,14 @@ def _finalize_ticket(ticket_id):
         t["completed_at"] = _now_ms()
         snap = t
         if t.get("origin") == "square":
-            write_back = (t["id"], "COMPLETED")
             _recently_closed[ticket_id] = time.time()   # poll bỏ qua vài giây
+            if HOLD_TILL_DONE:
+                # counter-service (Saigon): KDS chỉ ĐỌC, KHÔNG ghi ngược Square (POS
+                # lo vòng đời đơn). Chặn BỀN để poll không thêm lại — đơn chưa trả ở
+                # POS vẫn OPEN, nếu không chặn sẽ hiện lại sau khi bếp đã bấm Done.
+                _done_ids[ticket_id] = time.time()
+            else:
+                write_back = (t["id"], "COMPLETED")   # dine-in: đẩy Square rời OPEN
         _merge_suppress.pop(ticket_id, None)
         del _tickets[ticket_id]
     record_history(snap, "SERVED")
@@ -792,10 +825,11 @@ def mark_paid(ticket_id):
 
 
 def maybe_complete(ticket_id):
-    """Hoàn tất đơn KHI VÀ CHỈ KHI: đã trả tiền VÀ mọi món đã giao (gạch ngang)."""
+    """Hoàn tất đơn. Dine-in (Délice): cần trả tiền VÀ giao hết món. Counter-service
+    (Saigon HOLD_TILL_DONE): payment ở POS -> chỉ cần bếp đã xong hết món (Done)."""
     with _lock:
         t = _tickets.get(ticket_id)
-        ready = bool(t and t.get("paid") and _all_served(t))
+        ready = bool(t and _all_served(t) and (t.get("paid") or HOLD_TILL_DONE))
     if ready:
         _finalize_ticket(ticket_id)
 
