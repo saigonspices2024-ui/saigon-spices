@@ -54,6 +54,15 @@ HOLD_TILL_DONE = os.environ.get("KDS_HOLD_TILL_DONE", "1").strip().lower() not i
 # báo OPEN (đơn chưa trả ở POS vẫn OPEN). order_id -> timestamp, dọn sau TTL.
 _done_ids = {}
 _DONE_TTL_S = 12 * 3600
+# Counter-service: đọc thêm đơn vừa COMPLETED (đã trả ở POS) trong ngần này phút để
+# bắt đơn trả-nhanh (Square đóng đơn ngay -> KDS đọc OPEN không kịp). Bắt 1 lần là
+# đủ (sau đó vé nằm lại nhờ _resolve_vanished giữ). 0 = tắt. Chỉ bật khi HOLD_TILL_DONE.
+try:
+    CLOSED_LOOKBACK_MIN = int(os.environ.get("KDS_CLOSED_LOOKBACK_MIN", "30"))
+except ValueError:
+    CLOSED_LOOKBACK_MIN = 30
+if not HOLD_TILL_DONE:
+    CLOSED_LOOKBACK_MIN = 0
 # Vé chính vừa được GỘP thêm món của vé phụ (lúc thu chung bằng thẻ): poll kế tiếp
 # sẽ thấy món lạ nhảy vào -> ĐỪNG kêu chuông "gọi thêm", đồ đã ra bàn rồi. Đánh
 # dấu id vé chính tới hạn này để _merge_items bỏ qua cờ added.
@@ -1486,7 +1495,8 @@ class Handler(BaseHTTPRequestHandler):
             _subscribers.discard(q)
 
 
-POLLER = square_client.Poller(sync_from_square_orders, interval=4)
+POLLER = square_client.Poller(sync_from_square_orders, interval=4,
+                              closed_lookback_min=CLOSED_LOOKBACK_MIN)
 
 
 def _station_map_loop():

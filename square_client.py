@@ -135,6 +135,30 @@ def search_closed_orders(token, env, location_ids, start_rfc3339):
     return _request("POST", "/v2/orders/search", token, env, body).get("orders", [])
 
 
+def search_recent_completed(token, env, location_ids, minutes):
+    """Đơn vừa COMPLETED (đã trả tiền + đóng) trong `minutes` phút gần đây.
+
+    ⭐ COUNTER-SERVICE (Saigon): khách trả TẠI POS -> Square ĐÓNG đơn ngay (rời OPEN).
+    KDS chỉ đọc đơn OPEN nên đơn trả nhanh KHÔNG kịp bắt -> bếp không thấy. Đọc thêm
+    đơn vừa-đóng gần đây làm VÉ NẤU (đơn đã trả nhưng bếp chưa làm). Chỉ COMPLETED,
+    KHÔNG lấy CANCELED (đơn huỷ không phải để nấu). Bắt 1 lần là đủ — sau đó vé nằm
+    lại nhờ _resolve_vanished giữ, tới khi bếp bấm Done."""
+    dt = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=minutes)
+    start = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    body = {
+        "location_ids": location_ids,
+        "query": {
+            "filter": {
+                "state_filter": {"states": ["COMPLETED"]},
+                "date_time_filter": {"closed_at": {"start_at": start}},
+            },
+            "sort": {"sort_field": "CLOSED_AT", "sort_order": "DESC"},
+        },
+        "limit": 100,
+    }
+    return _request("POST", "/v2/orders/search", token, env, body).get("orders", [])
+
+
 def _catalog_list(token, env, obj_type):
     """Lấy toàn bộ object 1 loại từ Catalog API (tự lật trang qua cursor)."""
     objs = []
@@ -378,9 +402,11 @@ def verify(token, env):
 # Vòng lặp poll chạy nền
 # ---------------------------------------------------------------------------
 class Poller:
-    def __init__(self, on_orders, interval=4):
+    def __init__(self, on_orders, interval=4, closed_lookback_min=0):
         self.on_orders = on_orders      # callback(list_of_square_orders)
         self.interval = interval
+        # Counter-service: đọc thêm đơn vừa COMPLETED trong ngần này phút (0 = tắt).
+        self.closed_lookback_min = closed_lookback_min
         self._stop = threading.Event()
         self._thread = None
         self.status = {"connected": False, "last": None, "error": None, "locations": []}
@@ -405,6 +431,13 @@ class Poller:
                 self.status["locations"] = [l.get("name") for l in locs]
                 orders = search_open_orders(cfg["token"], cfg["env"], loc_ids,
                                             order_window_start()) if loc_ids else []
+                # Counter-service: gộp thêm đơn vừa-trả (COMPLETED) gần đây làm vé nấu.
+                if loc_ids and self.closed_lookback_min > 0:
+                    try:
+                        orders = orders + search_recent_completed(
+                            cfg["token"], cfg["env"], loc_ids, self.closed_lookback_min)
+                    except Exception as e:
+                        print(f"[POLL] đọc đơn đã-trả lỗi (bỏ qua): {e}", flush=True)
                 self.on_orders(orders)
                 self.status.update(connected=True, last=time.time(), error=None)
             except urllib.error.HTTPError as e:
