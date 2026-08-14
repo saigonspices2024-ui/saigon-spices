@@ -402,11 +402,15 @@ def verify(token, env):
 # Vòng lặp poll chạy nền
 # ---------------------------------------------------------------------------
 class Poller:
-    def __init__(self, on_orders, interval=4, closed_lookback_min=0):
+    def __init__(self, on_orders, interval=4, closed_lookback_min=0, closed_startup_buffer_min=5):
         self.on_orders = on_orders      # callback(list_of_square_orders)
         self.interval = interval
         # Counter-service: đọc thêm đơn vừa COMPLETED trong ngần này phút (0 = tắt).
         self.closed_lookback_min = closed_lookback_min
+        # Ngay sau khi RESTART chỉ nhìn lại ngần này phút (không kéo đơn done CŨ hiện
+        # lại). Cửa sổ nới dần từ mức này lên closed_lookback_min theo thời gian chạy.
+        self.closed_startup_buffer_min = closed_startup_buffer_min
+        self._started_at = time.time()
         self._stop = threading.Event()
         self._thread = None
         self.status = {"connected": False, "last": None, "error": None, "locations": []}
@@ -432,10 +436,16 @@ class Poller:
                 orders = search_open_orders(cfg["token"], cfg["env"], loc_ids,
                                             order_window_start()) if loc_ids else []
                 # Counter-service: gộp thêm đơn vừa-trả (COMPLETED) gần đây làm vé nấu.
+                # Cửa sổ = min(lookback, thời-gian-đã-chạy + buffer): mới restart thì
+                # chỉ nhìn lại ~buffer phút (khỏi kéo đơn done cũ hiện lại), chạy lâu
+                # thì nới tới lookback.
                 if loc_ids and self.closed_lookback_min > 0:
+                    elapsed_min = (time.time() - self._started_at) / 60.0
+                    eff = min(self.closed_lookback_min,
+                              elapsed_min + self.closed_startup_buffer_min)
                     try:
                         orders = orders + search_recent_completed(
-                            cfg["token"], cfg["env"], loc_ids, self.closed_lookback_min)
+                            cfg["token"], cfg["env"], loc_ids, eff)
                     except Exception as e:
                         print(f"[POLL] đọc đơn đã-trả lỗi (bỏ qua): {e}", flush=True)
                 self.on_orders(orders)
