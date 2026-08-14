@@ -100,24 +100,41 @@ html, body {
 .hist-card .item.voided .name { color: var(--red); }
 
 /* ---- Grid ---------------------------------------------------------- */
+/* BỐ CỤC NGANG: đơn xếp thành CỘT chạy trái->phải, cuộn ngang (kéo phải-trái để
+   xem đơn), thay vì grid dọc. Mỗi cột rộng cố định, cao hết màn. */
 .grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: flex-start;
   gap: 16px;
   padding: 16px;
-  align-content: start;
+  overflow-x: auto;
+  overflow-y: hidden;
+  height: calc(100vh - 60px);   /* trừ thanh trên cùng */
+  scroll-snap-type: x proximity;
+}
+.grid > .ticket { flex: 0 0 320px; }   /* rộng như docket cũ, KHÔNG phóng to */
+.unpaid-note {
+  flex: 1; text-align: center; padding: 10px;
+  color: var(--red); font-size: 16px; font-weight: 800;
+}
+.grid > .ticket, .grid > .tbl-group {
+  max-height: 100%;
+  overflow-y: auto;             /* đơn dài thì cuộn trong cột */
+  scroll-snap-align: start;
 }
 .empty {
-  grid-column: 1 / -1;
   text-align: center;
   color: var(--muted);
   padding: 80px 20px;
-  font-size: 18px;
+  font-size: 22px;
+  width: 100%;
 }
 
 /* ---- Nhóm bàn (nhiều người cùng bàn) ------------------------------- */
 .tbl-group {
-  grid-column: 1 / -1;                 /* dải ngang cả bàn -> đơn không lạc */
+  flex: 0 0 344px;                      /* bố cục ngang: cả bàn là 1 cột */
   border: 2px solid var(--accent);
   border-radius: 16px;
   padding: 10px;
@@ -137,7 +154,7 @@ html, body {
 .tbl-pay:active { transform: scale(.97); }
 .tbl-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: 1fr;   /* trong cột bàn: các vé xếp dọc */
   gap: 12px;
 }
 
@@ -184,7 +201,7 @@ html, body {
 .badge.TAKEAWAY { background: rgba(168,85,247,.18);  color: var(--take); }
 .badge.DELIVERY { background: rgba(20,184,166,.18);  color: var(--deliver); }
 .badge.UNKNOWN  { background: rgba(148,163,184,.18); color: #94a3b8; }
-.ticket-head .where { font-size: 17px; font-weight: 700; }
+.ticket-head .where { font-size: 25px; font-weight: 800; }
 .ticket-head .spacer { flex: 1; }
 .timer {
   font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums;
@@ -267,14 +284,14 @@ html, body {
 }
 .sound-prompt.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .item .qty {
-  min-width: 34px; height: 30px; padding: 0 6px;
+  min-width: 40px; height: 36px; padding: 0 8px;
   display: flex; align-items: center; justify-content: center;
   background: var(--panel); border-radius: 7px;
-  font-weight: 800; font-size: 16px; color: var(--accent);
+  font-weight: 800; font-size: 20px; color: var(--accent);
 }
 .item .detail { flex: 1; }
-.item .name { font-size: 17px; font-weight: 600; line-height: 1.25; }
-.item .variation { font-size: 13px; color: var(--muted); }
+.item .name { font-size: 22px; font-weight: 600; line-height: 1.25; }
+.item .variation { font-size: 16px; color: var(--muted); }
 .item .mods { margin-top: 3px; }
 .item .mod {
   display: inline-block; font-size: 13px; color: var(--amber);
@@ -414,7 +431,7 @@ code { background: var(--card); padding: 2px 6px; border-radius: 5px; font-size:
 .pay-err[hidden] { display: none; }
 
 /* Tên + SĐT khách (đơn QR) trên vé — nhân viên biết ai ngồi bàn */
-.cust { padding: 4px 14px 2px; font-size: 15px; font-weight: 600; color: var(--text); }
+.cust { padding: 4px 14px 2px; font-size: 18px; font-weight: 600; color: var(--text); }
 .cust .ph { color: var(--muted); font-weight: 500; }
 
 /* Bảng thống kê cuối ngày ở màn History (số đơn + số lượng mỗi món bán ra) */

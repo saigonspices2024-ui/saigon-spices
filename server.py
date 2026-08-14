@@ -833,11 +833,12 @@ def mark_paid(ticket_id):
 
 
 def maybe_complete(ticket_id):
-    """Hoàn tất đơn. Dine-in (Délice): cần trả tiền VÀ giao hết món. Counter-service
-    (Saigon HOLD_TILL_DONE): payment ở POS -> chỉ cần bếp đã xong hết món (Done)."""
+    """Hoàn tất (tắt) đơn KHI VÀ CHỈ KHI: ĐÃ TRẢ TIỀN + đã giao hết món. Chủ chốt:
+    đơn CHƯA thanh toán thì KHÔNG cho tắt (chống cho món ra mà chưa thu tiền) — kể
+    cả counter-service (đơn trả ở POS thì paid=True sẵn, đơn OPEN chưa trả thì chặn)."""
     with _lock:
         t = _tickets.get(ticket_id)
-        ready = bool(t and _all_served(t) and (t.get("paid") or HOLD_TILL_DONE))
+        ready = bool(t and _all_served(t) and t.get("paid"))
     if ready:
         _finalize_ticket(ticket_id)
 

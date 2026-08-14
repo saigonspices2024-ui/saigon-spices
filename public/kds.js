@@ -374,17 +374,21 @@
       // Expo để chạy món + thu tiền. Bump sang READY, KHÔNG đóng bill (tiền vẫn thu
       // ở Expo) -> an toàn kể cả đơn QR chưa trả. Giữ Acknowledge cho đơn bị huỷ.
       const kitchenDone = STATION === "kitchen" && !activeStation && allDone && !voided;
-      // Expo: nút "✓ Served" = đã chạy món ra cho khách -> tắt đơn (finalize, gỡ
-      // khỏi màn). Counter-service: Expo là QUYỀN CAO NHẤT, tắt được BẤT CỨ LÚC NÀO
-      // (không cần bếp tick hết). Bếp chưa xong thì nút để kiểu viền (early) nhắc.
-      const expoServed = HAS_SERVE && !voided && !allServed;
+      // Expo: nút "✓ Served" = đã chạy món ra cho khách -> tắt đơn (finalize, gỡ khỏi
+      // màn). Tắt được bất cứ lúc nào (không cần bếp tick hết) NHƯNG chỉ khi ĐÃ TRẢ
+      // TIỀN — chủ chốt: đơn chưa thanh toán thì KHÔNG cho tắt (chống cho món ra mà
+      // chưa thu tiền). Đơn chưa trả hiện nhắc thay vì nút.
+      const expoServed = HAS_SERVE && !voided && !allServed && t.paid;
+      const expoUnpaid = HAS_SERVE && !voided && !allServed && !t.paid;
       let footBtn = "";
       if (voided) {
         footBtn = `<button class="bump ack" data-ack="${t.id}">Acknowledge</button>`;
       } else if (kitchenDone) {
         footBtn = `<button class="bump serve" data-kdone="${t.id}">✓ Done</button>`;
       } else if (expoServed) {
-        footBtn = `<button class="bump serve ${t.paid ? "" : "early"}" data-serve="${t.id}">✓ Served</button>`;
+        footBtn = `<button class="bump serve" data-serve="${t.id}">✓ Served</button>`;
+      } else if (expoUnpaid) {
+        footBtn = `<span class="unpaid-note">⚠ Chưa thanh toán</span>`;
       }
       const foot = (payBtn || footBtn) ? `<div class="ticket-foot">${payBtn}${footBtn}</div>` : "";
       return `
