@@ -2,7 +2,7 @@
    Chỉ cache "vỏ" tĩnh để cài được PWA và chịu được lúc server chớp tắt.
    KHÔNG đụng vào /api/ (bao gồm SSE /api/stream) và /webhooks/ — luôn để đi
    thẳng ra mạng, giữ dữ liệu realtime. */
-const CACHE = "saigon-kds-v1";
+const CACHE = "saigon-kds-v2";
 const SHELL = [
   "/kitchen", "/expo", "/kds.css", "/kds.js",
   "/icon-kitchen-192.png", "/icon-kitchen-512.png",
