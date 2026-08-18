@@ -105,17 +105,19 @@ html, body {
    đơn, không phí chỗ dọc. */
 .grid {
   display: flex;
-  flex-direction: column;       /* xếp dọc trong 1 cột */
-  flex-wrap: wrap;              /* đầy chiều cao -> tràn sang cột mới bên phải */
-  align-content: flex-start;
+  flex-direction: row;          /* MỖI ĐƠN 1 CỘT dọc, xếp cạnh nhau theo hàng ngang */
+  flex-wrap: nowrap;            /* KHÔNG bẻ dòng -> chỉ cuộn ngang, không dồn cột dọc */
+  align-items: flex-start;      /* cột cao theo nội dung, canh mép trên */
   gap: 16px;
   padding: 16px;
-  height: calc(100vh - 60px);   /* chiều cao cố định để biết khi nào đầy cột */
-  overflow-x: auto;             /* nhiều cột -> cuộn ngang */
+  height: calc(100vh - 60px);
+  overflow-x: auto;             /* kéo NGANG (phải<-trái) để xem đơn mới bên phải */
   overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;   /* cuộn ngang mượt trên iPad */
 }
 .grid > .ticket { flex: 0 0 auto; width: 320px; }   /* docket rộng như cũ */
-.grid > .tbl-group { width: 344px; }
+.grid > .tbl-group { flex: 0 0 auto; width: 344px; }
+/* Đơn dài hơn màn -> cuộn DỌC BÊN TRONG cột đó, không kéo cả bảng */
 .grid > .ticket, .grid > .tbl-group { max-height: 100%; overflow-y: auto; }
 .unpaid-note {
   flex: 1; text-align: center; padding: 10px;
@@ -189,6 +191,7 @@ html, body {
   display: flex; align-items: center; gap: 10px;
   padding: 12px 14px;
   border-bottom: 1px solid var(--line);
+  flex-wrap: wrap; row-gap: 6px;   /* chật (nhiều badge) -> xuống dòng, KHÔNG cắt timer */
 }
 .badge {
   font-size: 12px; font-weight: 800; text-transform: uppercase;
@@ -198,11 +201,18 @@ html, body {
 .badge.TAKEAWAY { background: rgba(168,85,247,.18);  color: var(--take); }
 .badge.DELIVERY { background: rgba(20,184,166,.18);  color: var(--deliver); }
 .badge.UNKNOWN  { background: rgba(148,163,184,.18); color: #94a3b8; }
-.ticket-head .where { font-size: 25px; font-weight: 800; }
-.ticket-head .spacer { flex: 1; }
+/* where chiếm chỗ trống + cắt gọn (…) khi chật; timer dồn về phải, xuống dòng nếu hết chỗ */
+.ticket-head .where {
+  font-size: 25px; font-weight: 800;
+  flex: 1 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ticket-head .spacer { flex: 0 0 0; }    /* bỏ tác dụng đẩy (timer tự dồn phải bằng margin) */
 .timer {
   font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums;
   padding: 3px 8px; border-radius: 7px;
+  flex: 0 0 auto; white-space: nowrap;   /* timer LUÔN hiện đủ, không co, không cắt */
+  margin-left: auto;                     /* dồn về mép phải; chật thì rớt xuống dòng dưới */
 }
 .timer.ok   { color: var(--green); }
 .timer.warn { color: var(--amber); }

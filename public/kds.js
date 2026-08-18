@@ -245,6 +245,7 @@
 
   /* ---- Thời gian chờ + tô màu -------------------------------------- */
   function elapsed(ms) {
+    if (!Number.isFinite(ms)) return "0:00";   // đơn thiếu received_at -> khỏi "NaN:NaN"
     const s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
     const m = Math.floor(s / 60);
     return `${m}:${String(s % 60).padStart(2, "0")}`;
