@@ -305,7 +305,9 @@
   function renderGroups(mine) {
     const groups = [], byKey = new Map();
     mine.forEach(t => {
-      const key = (t.type === "DINE_IN" && t.table) ? "tbl:" + t.table : "solo:" + t.id;
+      // MỖI ĐƠN 1 CỘT RIÊNG: không gom vé cùng bàn nữa (chủ Saigon muốn mỗi khách
+      // 1 cột; gom lại làm nhiều đơn chồng trong 1 cột hẹp -> đơn dưới bị khuất).
+      const key = "solo:" + t.id;
       let g = byKey.get(key);
       if (!g) { g = { table: (t.type === "DINE_IN" ? t.table : null), tickets: [] }; byKey.set(key, g); groups.push(g); }
       g.tickets.push(t);
