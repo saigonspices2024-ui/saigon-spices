@@ -23,6 +23,7 @@ import threading
 import time
 import urllib.error
 import urllib.parse
+import urllib.request
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -54,6 +55,93 @@ HOLD_TILL_DONE = os.environ.get("KDS_HOLD_TILL_DONE", "1").strip().lower() not i
 # báo OPEN (đơn chưa trả ở POS vẫn OPEN). order_id -> timestamp, dọn sau TTL.
 _done_ids = {}
 _DONE_TTL_S = 12 * 3600
+_done_lock = threading.Lock()
+
+# ---------------------------------------------------------------------------
+# NHỚ ĐƠN-ĐÃ-NẤU QUA RESTART (Upstash Redis, free) — CHỐNG SÓT ĐƠN TRẢ-NHANH
+# ---------------------------------------------------------------------------
+# Đơn counter-service trả tiền ngay -> Square đóng liền (COMPLETED). KDS bắt loại
+# này bằng cửa sổ "đơn vừa-đóng gần đây", nhưng cửa sổ CO nhỏ lại sau mỗi restart
+# (Render free ngủ/restart) -> đơn trả 5-30 phút trước bị SÓT. Nếu có Upstash thì
+# _done_ids (đơn bếp đã bấm Done) được LƯU BỀN -> nới rộng cửa sổ quét an toàn (đơn
+# cũ đã nấu bị lọc, chỉ đơn thật sự chưa nấu mới hiện). Không cấu hình Upstash ->
+# chạy y như cũ (cửa sổ nhỏ), KHÔNG đổi hành vi gì.
+_UPSTASH_URL = os.environ.get("UPSTASH_REDIS_REST_URL", "").strip().rstrip("/")
+_UPSTASH_TOKEN = os.environ.get("UPSTASH_REDIS_REST_TOKEN", "").strip()
+_UPSTASH_STATE_KEY = os.environ.get("KDS_STATE_KEY", "saigon:kds:state").strip()
+_state_save_lock = threading.Lock()
+_last_state_save = 0.0
+_STATE_SAVE_THROTTLE_S = 12   # ghi tối đa ~1 lần/12s (dưới hạn Upstash free 10k/ngày)
+
+
+def _upstash_on():
+    return bool(_UPSTASH_URL and _UPSTASH_TOKEN)
+
+
+def _upstash_cmd(args, timeout=5):
+    """Gọi 1 lệnh Redis qua REST Upstash. Trả field result, None nếu lỗi. Không
+    raise: mất mạng thì rơi về hành vi cũ, không làm sập poll/request."""
+    try:
+        req = urllib.request.Request(
+            _UPSTASH_URL, data=json.dumps(args).encode("utf-8"), method="POST",
+            headers={"Authorization": "Bearer " + _UPSTASH_TOKEN,
+                     "Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8")).get("result")
+    except (urllib.error.URLError, ValueError, OSError) as e:
+        print("[DONE-IDS] Upstash lỗi (%s): %s" % (args[0] if args else "?", e), flush=True)
+        return None
+
+
+def _save_state(force=False):
+    """Ghi CẢ BẢNG đơn (đang trên màn) + _done_ids lên Upstash để sống qua restart.
+    Lưu nguyên trạng thái (NEW/READY + cờ done từng món) -> restart KHÔNG mất tiến
+    độ, đơn đã nấu KHÔNG hiện lại, đơn trả-nhanh bị sót vẫn được cửa-sổ-rộng bắt về.
+    Bóp ga tối đa 1 lần/12s (trừ khi force) cho nhẹ Upstash. Lỗi -> bỏ qua (an toàn)."""
+    if not _upstash_on():
+        return
+    global _last_state_save
+    now = time.time()
+    with _state_save_lock:
+        if not force and now - _last_state_save < _STATE_SAVE_THROTTLE_S:
+            return
+        _last_state_save = now
+    with _lock:
+        board = json.dumps([t for t in _tickets.values() if t.get("state") != "COMPLETED"])
+    with _done_lock:
+        done = json.dumps({k: v for k, v in _done_ids.items() if now - v <= _DONE_TTL_S})
+    _upstash_cmd(["SET", _UPSTASH_STATE_KEY, '{"tickets":%s,"done":%s}' % (board, done)])
+
+
+def _load_state():
+    """Khôi phục bảng đơn + _done_ids từ Upstash lúc khởi động (sau restart)."""
+    if not _upstash_on():
+        return
+    raw = _upstash_cmd(["GET", _UPSTASH_STATE_KEY])
+    if not raw:
+        return
+    try:
+        data = json.loads(raw) if isinstance(raw, str) else raw
+    except ValueError:
+        return
+    if not isinstance(data, dict):
+        return
+    now = time.time()
+    tickets = data.get("tickets") or []
+    with _lock:
+        for t in tickets:
+            if isinstance(t, dict) and t.get("id") and t.get("state") != "COMPLETED":
+                _tickets[t["id"]] = t
+    with _done_lock:
+        for k, v in (data.get("done") or {}).items():
+            try:
+                if now - float(v) <= _DONE_TTL_S:
+                    _done_ids[k] = float(v)
+            except (TypeError, ValueError):
+                pass
+    print("[STATE] khôi phục %d đơn + %d done-id từ Upstash" % (len(tickets), len(_done_ids)), flush=True)
+
+
 # Counter-service: đọc thêm đơn vừa COMPLETED (đã trả ở POS) trong ngần này phút để
 # bắt đơn trả-nhanh (Square đóng đơn ngay -> KDS đọc OPEN không kịp). Bắt 1 lần là
 # đủ (sau đó vé nằm lại nhờ _resolve_vanished giữ). 0 = tắt. Chỉ bật khi HOLD_TILL_DONE.
@@ -63,6 +151,14 @@ except ValueError:
     CLOSED_LOOKBACK_MIN = 30
 if not HOLD_TILL_DONE:
     CLOSED_LOOKBACK_MIN = 0
+# Có Upstash (nhớ đơn-đã-nấu bền) -> nới cửa sổ rộng + BỎ co-window sau restart, để
+# bắt lại đơn trả-nhanh bị sót lúc server ngủ/restart. An toàn vì _done_ids bền lọc
+# đơn đã nấu. Không có Upstash -> giữ buffer nhỏ 5 phút như cũ (tránh đơn cũ hiện lại).
+if _upstash_on() and CLOSED_LOOKBACK_MIN > 0:
+    CLOSED_LOOKBACK_MIN = max(CLOSED_LOOKBACK_MIN, 60)
+    CLOSED_STARTUP_BUFFER_MIN = CLOSED_LOOKBACK_MIN
+else:
+    CLOSED_STARTUP_BUFFER_MIN = 5
 # Vé chính vừa được GỘP thêm món của vé phụ (lúc thu chung bằng thẻ): poll kế tiếp
 # sẽ thấy món lạ nhảy vào -> ĐỪNG kêu chuông "gọi thêm", đồ đã ra bàn rồi. Đánh
 # dấu id vé chính tới hạn này để _merge_items bỏ qua cờ added.
@@ -605,6 +701,7 @@ def sync_from_square_orders(orders):
     if vanished:
         threading.Thread(target=_resolve_vanished, args=(vanished,), daemon=True).start()
     broadcast()
+    _save_state()   # lưu bảng đơn qua Upstash (bóp ga 12s) -> sống qua restart
 
 
 def _resolve_vanished(ids):
@@ -793,6 +890,7 @@ def _finalize_ticket(ticket_id):
     COMPLETED về Square (đơn rời OPEN, poll không thêm lại), gỡ khỏi mọi màn."""
     write_back = None
     snap = None
+    added_done = False
     with _lock:
         t = _tickets.get(ticket_id)
         if not t:
@@ -807,10 +905,13 @@ def _finalize_ticket(ticket_id):
                 # lo vòng đời đơn). Chặn BỀN để poll không thêm lại — đơn chưa trả ở
                 # POS vẫn OPEN, nếu không chặn sẽ hiện lại sau khi bếp đã bấm Done.
                 _done_ids[ticket_id] = time.time()
+                added_done = True
             else:
                 write_back = (t["id"], "COMPLETED")   # dine-in: đẩy Square rời OPEN
         _merge_suppress.pop(ticket_id, None)
         del _tickets[ticket_id]
+    if added_done:
+        _save_state(force=True)   # lưu bền ngay để đơn này không hiện lại sau restart
     record_history(snap, "SERVED")
     if write_back:
         push_to_square_async(*write_back)
@@ -1497,7 +1598,8 @@ class Handler(BaseHTTPRequestHandler):
 
 
 POLLER = square_client.Poller(sync_from_square_orders, interval=4,
-                              closed_lookback_min=CLOSED_LOOKBACK_MIN)
+                              closed_lookback_min=CLOSED_LOOKBACK_MIN,
+                              closed_startup_buffer_min=CLOSED_STARTUP_BUFFER_MIN)
 
 
 def _station_map_loop():
@@ -1512,6 +1614,7 @@ def _station_map_loop():
 
 def main():
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
+    _load_state()   # khôi phục bảng đơn + đơn đã-nấu từ Upstash (nếu có) TRƯỚC khi poll
     POLLER.start()  # tự poll Square nếu đã cấu hình token trong .env
     threading.Thread(target=_station_map_loop, daemon=True).start()
     print(f"  • Trạm bếp       : {', '.join(STATIONS) if STATIONS else '1 bếp (không phân trạm)'}")
