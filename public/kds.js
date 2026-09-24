@@ -576,14 +576,16 @@
     }
   }, 5000);
 
-  // Lưới an toàn: cứ 12s tự lấy đơn 1 lần (phòng khi SSE kẹt mà không báo lỗi).
+  // Lưới an toàn: định kỳ tự lấy đơn 1 lần (phòng khi SSE kẹt mà không báo lỗi).
+  // 30s thay vì 12s để tiết kiệm băng thông — SSE (broadcast-on-change) mới là
+  // kênh chính real-time, cái này chỉ là resync dự phòng.
   setInterval(async () => {
     try {
       const r = await fetch("/api/tickets", { cache: "no-store" });
       if (r.ok) { applyTickets((await r.json()).tickets); lastEventAt = Date.now();
                   conn.classList.add("online"); }
     } catch (_) {}
-  }, 12000);
+  }, 30000);
 
   // Giữ màn hình tablet luôn sáng (không tự khoá) khi có thể.
   let wakeLock = null;
