@@ -1210,8 +1210,19 @@ def snapshot():
 # ---------------------------------------------------------------------------
 # SSE broadcast
 # ---------------------------------------------------------------------------
+_last_bcast = None   # chữ ký bảng đơn lần phát gần nhất
+
 def broadcast():
+    """Đẩy bảng đơn cho các màn qua SSE. TIẾT KIỆM BĂNG THÔNG: chỉ phun khi bảng
+    ĐỔI THẬT so với lần trước — trước đây poll gọi broadcast mỗi vài giây nên phun
+    cả bảng cho MỌI iPad kể cả không có gì đổi (ngốn băng thông → hết 5GB free của
+    Render → treo cả workspace). Client mới kết nối vẫn nhận snapshot ngay ở
+    _stream(); ping giữ kết nối sống nên không sợ đứng màn."""
+    global _last_bcast
     data = json.dumps({"type": "tickets", "tickets": snapshot()})
+    if data == _last_bcast:
+        return
+    _last_bcast = data
     dead = []
     for q in list(_subscribers):
         try:
