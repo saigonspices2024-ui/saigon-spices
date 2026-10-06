@@ -1699,11 +1699,38 @@ def _station_map_loop():
         time.sleep(300)
 
 
+# Giữ app QR order (Render free, ngủ sau ~15 phút vắng) THỨC trong giờ bán: KDS (luôn
+# thức khi iPad bếp mở) gọi nó mỗi 10 phút -> khách quét QR mở ngay, khỏi chờ ~50s.
+# CHỈ trong giờ bán để không ngốn giờ chạy free của tài khoản Render. "" = tắt.
+ORDER_KEEPALIVE_URL = os.environ.get("ORDER_KEEPALIVE_URL",
+                                     "https://saigon-order.onrender.com/api/health").strip()
+ORDER_KEEPALIVE_HOURS = os.environ.get("ORDER_KEEPALIVE_HOURS", "10:45-20:30")
+
+
+def _keepalive_loop():
+    try:
+        a, b = ORDER_KEEPALIVE_HOURS.split("-")
+        start = int(a.split(":")[0]) * 60 + int(a.split(":")[1])
+        end = int(b.split(":")[0]) * 60 + int(b.split(":")[1])
+    except (ValueError, IndexError):
+        start, end = 645, 1230
+    while True:
+        now = datetime.datetime.now(_sydney_tz())
+        m = now.hour * 60 + now.minute
+        if ORDER_KEEPALIVE_URL and start <= m < end:
+            try:
+                urllib.request.urlopen(ORDER_KEEPALIVE_URL, timeout=60).read()
+            except Exception as e:
+                print("[KEEPALIVE] app order không phản hồi: %s" % e, flush=True)
+        time.sleep(600)
+
+
 def main():
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     _load_state()   # khôi phục bảng đơn + đơn đã-nấu từ Upstash (nếu có) TRƯỚC khi poll
     POLLER.start()  # tự poll Square nếu đã cấu hình token trong .env
     threading.Thread(target=_station_map_loop, daemon=True).start()
+    threading.Thread(target=_keepalive_loop, daemon=True).start()
     print(f"  • Trạm bếp       : {', '.join(STATIONS) if STATIONS else '1 bếp (không phân trạm)'}")
     print(f"Saigon Spices KDS chạy tại http://localhost:{PORT}")
     print(f"  • Bảng điều khiển : http://localhost:{PORT}/")
