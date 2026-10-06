@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FDDA02">
+<title>Saigon Spices — Order & Pay</title>
+<link rel="icon" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/order.css?v=1">
+</head>
+<body>
+
+<header class="top">
+  <img class="logo" src="/logo.png" alt="Saigon Spices">
+  <div class="top-txt">
+    <div class="brand">Saigon Spices</div>
+    <div class="sub">Order &amp; pay at your table</div>
+  </div>
+  <span class="gap"></span>
+  <span class="table-pill" id="tablePill"></span>
+</header>
+
+<div class="banner" id="closedBanner" hidden></div>
+
+<nav class="gnav" id="gnav"></nav>
+<main class="menu" id="menu"><p class="status">Loading the menu…</p></main>
+
+<button class="cartbar" id="cartBar" type="button" hidden>
+  <span class="cart-count" id="cartCount">0</span>
+  <span>View order</span>
+  <span class="gap"></span>
+  <span id="cartTotal"></span>
+</button>
+
+<!-- Chi tiết món -->
+<div class="sheet" id="itemSheet" hidden>
+  <div class="backdrop" data-close></div>
+  <div class="panel">
+    <button class="x" type="button" data-close aria-label="Close">✕</button>
+    <div class="scroll">
+      <img class="hero" id="siImg" alt="" hidden>
+      <div class="pad">
+        <h2 id="siName"></h2>
+        <p class="desc" id="siDesc"></p>
+        <div id="siMods"></div>
+        <label class="field">
+          <span>Note for the kitchen (optional)</span>
+          <input type="text" id="siNote" maxlength="120" placeholder="e.g. no onion, less spicy" autocomplete="off">
+        </label>
+      </div>
+    </div>
+    <div class="foot">
+      <div class="qty">
+        <button type="button" id="siMinus" aria-label="Less">−</button>
+        <span id="siQty">1</span>
+        <button type="button" id="siPlus" aria-label="More">+</button>
+      </div>
+      <button class="primary" id="siAdd" type="button"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Giỏ + checkout -->
+<div class="sheet" id="cartSheet" hidden>
+  <div class="backdrop" data-close></div>
+  <div class="panel">
+    <button class="x" type="button" data-close aria-label="Close">✕</button>
+    <div class="scroll">
+      <div class="pad">
+        <h2>Your order</h2>
+        <div id="cartList"></div>
+
+        <div class="block" id="diningBlock">
+          <div class="label">How are you eating?</div>
+          <div class="seg" id="diningSeg">
+            <button type="button" data-dining="here" class="on"><b>Have here</b><small id="hereSub"></small></button>
+            <button type="button" data-dining="away"><b>Take away</b><small>Packed to go</small></button>
+          </div>
+        </div>
+
+        <div class="block">
+          <label class="field">
+            <span>Your name <em>*</em></span>
+            <input type="text" id="cName" maxlength="40" autocomplete="given-name" placeholder="So we can find you">
+          </label>
+          <label class="field">
+            <span>Order note (optional)</span>
+            <input type="text" id="cNote" maxlength="200" placeholder="Allergies, e.g. no peanuts" autocomplete="off">
+          </label>
+          <label class="field">
+            <span>Email for receipt (optional)</span>
+            <input type="email" id="cEmail" maxlength="120" autocomplete="email" inputmode="email">
+          </label>
+        </div>
+
+        <div class="totalrow"><span>Total <small>(incl. GST)</small></span><strong id="cartSum"></strong></div>
+
+        <div class="block pay" id="payBlock">
+          <div class="label">Pay now</div>
+          <div id="applePayBtn" class="apple-pay" role="button" tabindex="0" hidden></div>
+          <div id="googlePayBtn" class="gpay" hidden></div>
+          <div class="or" id="payOr" hidden><span>or pay by card</span></div>
+          <div id="cardBox"></div>
+          <button class="primary" id="cardPay" type="button" disabled>Pay</button>
+          <p class="secure">🔒 Payments processed securely by Square</p>
+        </div>
+        <p class="error" id="payError" hidden></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Đã đặt -->
+<div class="sheet" id="doneSheet" hidden>
+  <div class="backdrop"></div>
+  <div class="panel done">
+    <div class="pad center">
+      <div class="tick">✓</div>
+      <h2>Thank you, <span id="dName"></span>!</h2>
+      <p class="big" id="dWhere"></p>
+      <p id="dHint"></p>
+      <div id="dList"></div>
+      <div class="totalrow"><span>Paid</span><strong id="dSum"></strong></div>
+      <a class="ghost" id="dReceipt" target="_blank" rel="noopener" hidden>View receipt</a>
+      <button class="primary" type="button" id="dMore">Order more</button>
+    </div>
+  </div>
+</div>
+
+<div class="paying" id="paying" hidden><div class="spin"></div><p>Processing payment…</p></div>
+
+<script src="/order.js?v=1"></script>
+</body>
+</html>
