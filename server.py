@@ -497,6 +497,33 @@ def _line_price(li, qty):
     return None
 
 
+def _online_recipient(order):
+    """Tên + SĐT khách của đơn Square Online (nằm trong recipient của fulfillment)."""
+    for f in order.get("fulfillments") or []:
+        for dk in ("delivery_details", "pickup_details", "shipment_details"):
+            rec = ((f or {}).get(dk) or {}).get("recipient") or {}
+            name = (rec.get("display_name") or "").strip()
+            if name:
+                return name, (rec.get("phone_number") or "").strip() or None
+    return None, None
+
+
+def _dining_from_modifiers(order):
+    """Khách chọn "Have here" / "Take away" ở modifier từng món -> loại đơn.
+    Có bất kỳ món Take away -> TAKEAWAY; có Have here -> DINE_IN; không có -> None."""
+    seen = set()
+    for li in order.get("line_items") or []:
+        for m in li.get("modifiers") or []:
+            n = (m.get("name") or "").strip().lower()
+            if n in ("take away", "takeaway", "take-away", "to go"):
+                seen.add("TAKEAWAY")
+            elif n in ("have here", "dine in", "dine-in", "eat in"):
+                seen.add("DINE_IN")
+    if "TAKEAWAY" in seen:
+        return "TAKEAWAY"
+    return "DINE_IN" if "DINE_IN" in seen else None
+
+
 def parse_square_order(order):
     """Chuyển một Square Order object -> ticket nội bộ của KDS."""
     fulfillments = order.get("fulfillments") or [{}]
@@ -516,6 +543,16 @@ def parse_square_order(order):
         otype = type_map.get(ftype, ftype)
         table = None
         guest = label
+
+    # Đơn QR Square Online (self-serve tại bàn): Square KHÔNG trả số bàn qua API,
+    # fulfillment về DELIVERY. Lấy TÊN KHÁCH từ recipient làm nhãn to trên vé,
+    # và suy Have here / Take away từ modifier khách chọn ở từng món.
+    online_name = online_phone = None
+    if (order.get("source") or {}).get("name") == "Square Online":
+        online_name, online_phone = _online_recipient(order)
+        if not table and not guest and online_name:
+            guest = online_name
+        otype = _dining_from_modifiers(order) or "DINE_IN"
 
     items = []
     for idx, li in enumerate(order.get("line_items", [])):
@@ -564,7 +601,7 @@ def parse_square_order(order):
         # Tên + SĐT khách (khách tự nhập ở màn order trước khi gửi bếp). Hiện lên
         # vé để nhân viên biết ai ngồi bàn — răn khách bỏ chạy, gọi được nếu cần.
         "cust_name": (order.get("metadata") or {}).get("qr_name") or None,
-        "cust_phone": (order.get("metadata") or {}).get("qr_phone") or None,
+        "cust_phone": (order.get("metadata") or {}).get("qr_phone") or online_phone or None,
         # Note gắn vào CẢ ĐƠN (khác note từng món) — vd "bàn dị ứng đậu phộng",
         # "ra món cùng lúc". Hiện thành băng đỏ cảnh báo ở đầu vé.
         "order_note": extract_order_note(order),
