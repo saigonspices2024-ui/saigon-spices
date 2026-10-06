@@ -554,6 +554,17 @@ def parse_square_order(order):
             guest = online_name
         otype = _dining_from_modifiers(order) or "DINE_IN"
 
+    # Đơn app QR order riêng (khách trả trước): số bàn + tên + Have here/Take away
+    # nằm sẵn trong metadata -> vé hiện "Table 21" (dine-in) hoặc tên khách (takeaway).
+    qmeta = order.get("metadata") or {}
+    if square_client.is_qr_order(order) and qmeta.get("qr_table"):
+        qt, qn = qmeta["qr_table"], (qmeta.get("qr_name") or "").strip() or None
+        if qmeta.get("qr_dining") == "away":
+            otype, table = "TAKEAWAY", None
+            guest = (qn or "Takeaway") + ("" if qt == "TA" else " · T%s" % qt)
+        else:
+            otype, table, guest = "DINE_IN", qt, qn
+
     items = []
     for idx, li in enumerate(order.get("line_items", [])):
         try:
@@ -676,6 +687,9 @@ def upsert_from_square(order, origin="square"):
     with _lock:
         # Nếu đơn đã tồn tại, cập nhật món nhưng giữ nguyên trạng thái bump + cờ done.
         existing = _tickets.get(ticket["id"])
+        # Đơn app QR (trả trước) CHƯA trả xong -> chưa lên bếp (thẻ có thể bị từ chối).
+        if not existing and ticket.get("qr") and not ticket.get("paid"):
+            return
         if existing:
             existing["items"] = _merge_items(existing["items"], ticket["items"],
                                              suppress_add=_suppress_add(ticket["id"]))
@@ -707,6 +721,9 @@ def sync_from_square_orders(orders):
         t = parse_square_order(o)
         t["origin"] = "square"
         with _lock:
+            # Đơn app QR (trả trước) chưa trả xong -> chưa lên bếp.
+            if t.get("qr") and not t.get("paid") and t["id"] not in _tickets:
+                continue
             # Vé vừa đóng bằng nút Thanh toán: đừng thêm lại dù Square còn báo OPEN.
             if t["id"] in _recently_closed:
                 continue
@@ -1503,6 +1520,28 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
+
+        if path == "/api/ingest":
+            # App QR order đẩy đơn VỪA TRẢ TIỀN sang ngay -> bếp thấy tức thì, không chờ
+            # Square SearchOrders (có lúc trễ vài phút). Chỉ nhận order_id rồi TỰ đọc lại
+            # đơn thật từ Square (id giả -> Square trả rỗng, bỏ qua). Idempotent.
+            body = self._read_body()
+            oid = (body.get("order_id") or "").strip()
+            if not oid:
+                return self._send_json({"ok": False, "message": "missing order_id"}, 400)
+            cfg = square_client.get_config()
+            if not cfg["token"]:
+                return self._send_json({"ok": False, "message": "square not configured"}, 503)
+            try:
+                order = square_client.retrieve_order(cfg["token"], cfg["env"], oid)
+            except Exception as e:
+                return self._send_json({"ok": False, "message": str(e)}, 502)
+            if not order or not order.get("line_items") or order.get("state") == "CANCELED":
+                return self._send_json({"ok": False, "message": "order not found"}, 404)
+            upsert_from_square(order, origin="square")
+            _save_state()
+            print("[KDS] ⚡ ingest đơn QR %s -> lên bếp ngay" % oid, flush=True)
+            return self._send_json({"ok": True})
 
         if path == "/api/sim":
             upsert_from_square(make_sample_order(), origin="sim")

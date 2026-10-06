@@ -1,5 +1,5 @@
 # Cấu hình deploy Render (Blueprint) cho Saigon Spices KDS.
-# Chỉ có service màn bếp (KDS). App QR order (saigon-order) sẽ thêm sau.
+# 2 service: saigon-kds (màn bếp) + saigon-order (QR order, khách trả trước).
 services:
   - type: web
     name: saigon-kds
@@ -17,3 +17,28 @@ services:
       # Terminal (nút Card trên Expo) — lấy sau khi ghép máy Square Terminal.
       - key: SQUARE_DEVICE_ID
         sync: false
+
+  # App QR order + trả tiền trước (Square Web Payments). Dùng CHUNG token Square với
+  # KDS (fromService) -> không phải dán token lần hai.
+  - type: web
+    name: saigon-order
+    runtime: python
+    rootDir: order
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server.py
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: SQUARE_ACCESS_TOKEN
+        fromService:
+          type: web
+          name: saigon-kds
+          envVarKey: SQUARE_ACCESS_TOKEN
+      - key: SQUARE_ENV
+        value: production
+      - key: SQUARE_APP_ID
+        value: sq0idp-R2pC1O8mL1vflr75QPK6Jg
+      - key: SQUARE_LOCATION_ID
+        value: LHV2HVC64GAVJ
+      - key: PYTHON_VERSION
+        value: 3.12.7
