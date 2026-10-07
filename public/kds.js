@@ -119,48 +119,13 @@
     return new Blob([ab], { type: "audio/wav" });
   }
 
-  // Màn bếp: chuông này báo ĐƠN MỚI (A5->E6 đi lên). Màn Expo: KHÔNG báo đơn
-  // mới — chuông này dùng cho MÓN SẴN SÀNG RA BÀN (bếp vừa tick xong 1 món), cố
-  // ý cao & gọn hơn (C6->G6) để nghe khác hẳn cả đơn mới lẫn tiếng huỷ đi xuống.
-  (function buildChime() {
-    const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-    if (!OC) return;
-    const rate = 44100, ctx = new OC(1, rate * 2, rate);
-    // master -> compressor: hai tiếng chuông chồng nhau vượt biên độ 1.0 (rè);
-    // compressor ghìm đỉnh lại mà vẫn giữ độ to.
-    const master = ctx.createGain(); master.gain.value = 1;
-    const comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -10; comp.ratio.value = 12;
-    comp.attack.value = 0.003; comp.release.value = 0.25;
-    master.connect(comp); comp.connect(ctx.destination);
-    if (STATION === "expo") {
-      bell(ctx, master, 0.02, 1046.5, 0.7, 0.55);  // C6
-      bell(ctx, master, 0.20, 1568.0, 1.1, 0.6);   // G6 -> "đinh-đích" cao, báo pick-up
-    } else {
-      bell(ctx, master, 0.02, 880.0, 1.3, 0.5);    // A5
-      bell(ctx, master, 0.22, 1318.5, 1.8, 0.55);  // E6  -> "đing-đong" đi lên
-    }
-    const done = ctx.startRendering();
-    if (done && done.then) done.then(b => { chimeEl.src = URL.createObjectURL(encodeWav(b)); });
-  })();
-
-  // Tiếng báo huỷ: ba tiếng gõ ĐI XUỐNG (C5 -> A4 -> F4), tiếng cuối ngân dài.
-  // Chuông đơn mới đi lên nghe vui; cái này đi xuống nghe như báo động.
-  (function buildAlert() {
-    const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-    if (!OC) return;
-    const rate = 44100, ctx = new OC(1, rate * 2, rate);
-    const master = ctx.createGain(); master.gain.value = 1;
-    const comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -10; comp.ratio.value = 12;
-    comp.attack.value = 0.003; comp.release.value = 0.25;
-    master.connect(comp); comp.connect(ctx.destination);
-    bell(ctx, master, 0.02, 523.25, 0.55, 0.55);   // C5
-    bell(ctx, master, 0.24, 440.00, 0.55, 0.55);   // A4
-    bell(ctx, master, 0.46, 349.23, 1.40, 0.60);   // F4 — ngân dài
-    const done = ctx.startRendering();
-    if (done && done.then) done.then(b => { alertEl.src = URL.createObjectURL(encodeWav(b)); });
-  })();
+  // Tiếng chuông là FILE WAV TĨNH (chime-kitchen / chime-expo / alert.wav). Trước đây
+  // dựng bằng OfflineAudioContext lúc mở trang: iPad đời cũ (Safari không trả
+  // promise từ startRendering) dựng hỏng -> chimeEl không có src -> mất tiếng và
+  // bấm nút Sound cũng không kêu. File tĩnh thì máy nào cũng phát được.
+  chimeEl.src = STATION === "expo" ? "/chime-expo.wav?v=2" : "/chime-kitchen.wav?v=2";
+  alertEl.src = "/alert.wav?v=2";
+  chimeEl.load(); alertEl.load();
 
   let lastAlarmAt = 0;
   function alarm() {
@@ -193,6 +158,7 @@
 
   soundBtn.addEventListener("click", () => {
     // Đang bật thì bấm = nghe thử (không tắt nhầm); muốn tắt thì bấm giữ.
+    lastBeepAt = 0;   // bấm nút = luôn kêu thử, không bị chặn chống-lặp
     if (soundOn && audioReady) { beep(); return; }
     soundOn = true;
     localStorage.setItem("kds_sound", "on");
@@ -283,6 +249,22 @@
     return typeLabel(t.type);
   }
 
+  // Modifier mỗi cái 1 dòng, chữ to (combo Lunch/Family = món khách chọn, bếp phải
+  // đọc rõ). Bỏ "Have here"/"Take away" khi đã khớp nhãn loại đơn trên đầu vé.
+  function modsHtml(mods, type) {
+    const list = (mods || []).filter(m => {
+      const n = String(m).trim().toLowerCase();
+      if (n === "have here" && type === "DINE_IN") return false;
+      if (n === "take away" && type === "TAKEAWAY") return false;
+      return true;
+    });
+    if (!list.length) return "";
+    return `<div class="mods">${list.map(m => {
+      const away = /^take ?away$/i.test(String(m).trim());
+      return `<div class="mod${away ? " mod-away" : ""}">▸ ${esc(m)}</div>`;
+    }).join("")}</div>`;
+  }
+
   function render() {
     const mine = tickets.filter(visible).sort((a, b) => a.received_at - b.received_at);
 
@@ -343,9 +325,7 @@
             <div class="name">${esc(it.name)}${it.added_at && !it.done && !it.cancelled ? `<span class="add-tag">ADDED</span>` : ""}</div>
             ${it.cancelled ? `<div class="void-tag">✕ VOIDED — stop / don't make</div>` : ""}
             ${it.variation ? `<div class="variation">${esc(it.variation)}</div>` : ""}
-            ${it.modifiers && it.modifiers.length
-              ? `<div class="mods">${it.modifiers.map(m => `<span class="mod">+ ${esc(m)}</span>`).join("")}</div>`
-              : ""}
+            ${modsHtml(it.modifiers, t.type)}
             ${it.note ? `<div class="note">📝 ${esc(it.note)}</div>` : ""}
             ${(STATION === "expo" || (STATION === "kitchen" && !activeStation)) && it.station
               ? `<span class="stn stn-${esc((it.station || "").toLowerCase())}">${esc(it.station)}</span>` : ""}
