@@ -1347,6 +1347,7 @@ STATIC_TYPES = {
     ".json": "application/json; charset=utf-8",
     ".webmanifest": "application/manifest+json; charset=utf-8",
     ".png": "image/png",
+    ".wav": "audio/wav",
     ".svg": "image/svg+xml",
 }
 
