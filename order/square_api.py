@@ -155,7 +155,10 @@ def fetch_menu(token, env, location_id, root_ids, dining_list_name):
                 if x.get("is_deleted"):
                     continue
                 options.append({"id": x["id"], "name": (md.get("name") or "").strip(),
-                                "price": int((md.get("price_money") or {}).get("amount") or 0)})
+                                "price": int((md.get("price_money") or {}).get("amount") or 0),
+                                # Tuỳ chọn hết hàng (vd Prawn Donut trong combo) bấm "sold out" trên Square.
+                                "sold_out": any(ov.get("location_id") == location_id and ov.get("sold_out")
+                                                for ov in (md.get("location_overrides") or []))})
             if not options:
                 continue
             single = ml.get("selection_type") == "SINGLE"

@@ -217,6 +217,8 @@ def build_lines(raw, dining):
             if len(picked) < ml["min"] or len(picked) > ml["max"]:
                 return None, 0, "Please choose %s for %s." % (ml["name"], item["name"])
             for c in picked:
+                if opts[c].get("sold_out"):
+                    return None, 0, "%s is sold out, sorry! Please choose another option." % opts[c]["name"]
                 unit += opts[c]["price"]
                 mods.append({"catalog_object_id": c, "quantity": "1"})
                 used.add(c)
