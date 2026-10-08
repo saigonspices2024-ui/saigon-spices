@@ -74,8 +74,8 @@
   const soundPrompt = document.createElement("div");
   soundPrompt.className = "sound-prompt";
   soundPrompt.textContent = STATION === "expo"
-    ? "🔔 Tap the screen to turn on the pick-up chime"
-    : "🔔 Tap the screen to turn on the new-order chime";
+    ? "🔔 TAP ANYWHERE to turn on sound"
+    : "🔔 TAP ANYWHERE to turn on sound";
   document.body.appendChild(soundPrompt);
   function refreshPrompt() {
     soundPrompt.classList.toggle("show", soundOn && !audioReady);
@@ -151,9 +151,19 @@
             .catch(() => { audioReady = false; refreshPrompt(); return false; });
   }
 
+  // TỰ CẬP NHẬT: 3 phút hỏi lại trang xem phiên bản kds.js (?v=) có đổi không. Có
+  // bản mới thì tự tải lại -> deploy xong iPad tự nhận, khỏi ai phải reload tay.
+  const MY_VER = ((document.querySelector('script[src*="kds.js"]') || {}).src || "").split("v=")[1] || "";
+  setInterval(() => {
+    fetch(location.pathname, { cache: "no-store" }).then(r => r.text()).then(html => {
+      const m = html.match(/kds\.js\?v=([0-9A-Za-z]+)/);
+      if (m && MY_VER && m[1] !== MY_VER) location.reload();
+    }).catch(() => {});
+  }, 3 * 60 * 1000);
+
   // Chạm đầu tiên ở bất kỳ đâu cũng mở khoá tiếng (yêu cầu của iOS/Chrome) —
   // và kêu luôn 1 tiếng để người dùng BIẾT là âm thanh đã chạy.
-  ["pointerdown", "touchend", "keydown"].forEach(ev =>
+  ["pointerdown", "touchend", "click", "keydown"].forEach(ev =>
     document.addEventListener(ev, () => { if (soundOn && !audioReady) beep(); }));
 
   soundBtn.addEventListener("click", () => {

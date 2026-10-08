@@ -469,3 +469,24 @@ code { background: var(--card); padding: 2px 6px; border-radius: 5px; font-size:
 .ticket.t-dine_in  { border-left: 6px solid var(--green); }
 .ticket.t-takeaway:not(.cancelled):not(.hasvoid) .ticket-head { background: rgba(239,68,68,.10); }
 .ticket.t-dine_in:not(.cancelled):not(.hasvoid) .ticket-head  { background: rgba(34,197,94,.10); }
+
+/* ---- CHỮ TO (08-10): bếp đọc từ xa trên iPad. Ghi đè các cỡ ở trên. ---- */
+.grid > .ticket { width: 440px; }
+.grid > .tbl-group { width: 464px; }
+.ticket-head .where { font-size: 32px; }
+.badge { font-size: 15px; padding: 5px 10px; }
+.timer { font-size: 21px; }
+.order-note { font-size: 21px; padding: 12px 14px; }
+.item { padding: 10px 0; }
+.item .qty { font-size: 30px; min-width: 50px; height: 44px; }
+.item .name { font-size: 32px; font-weight: 800; line-height: 1.15; }
+.item .variation { font-size: 22px; }
+.item .mod { font-size: 26px; line-height: 1.25; margin-top: 3px; }
+.item .note { font-size: 22px; padding: 4px 10px; }
+.item .price { font-size: 18px; }
+.item .check { min-width: 40px; height: 40px; font-size: 24px; }
+/* Nhắc bật tiếng: băng to trên đầu, chạm BẤT KỲ đâu là bật (không chặn bấm). */
+.sound-prompt {
+  top: 70px; bottom: auto; left: 50%; font-size: 24px; padding: 18px 30px;
+  background: #dc2626; animation: pulse 1.2s infinite;
+}
