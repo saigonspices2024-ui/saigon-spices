@@ -137,6 +137,26 @@
     if (p && p.catch) p.catch(() => {});
   }
 
+  // Chuông ĐƠN MỚI: Bếp dùng chime chính; Expo dùng file chuông bếp riêng (khác chuông
+  // "món ra pass") để quầy phân biệt được có khách mới với có món sẵn sàng.
+  const newEl = new Audio(STATION === "expo" ? "/chime-kitchen.wav?v=2" : "");
+  newEl.preload = "auto";
+  function beepNew() {
+    if (STATION !== "expo") return beep();
+    if (!soundOn) return Promise.resolve(false);
+    try { newEl.currentTime = 0; } catch (_) {}
+    const p = newEl.play();
+    return (p && p.then) ? p.then(() => { audioReady = true; refreshPrompt(); return true; })
+                             .catch(() => { audioReady = false; refreshPrompt(); return false; })
+                         : Promise.resolve(true);
+  }
+  ["pointerdown", "touchend", "click"].forEach(ev => document.addEventListener(ev, () => {
+    if (STATION === "expo" && soundOn && newEl.paused) {   // mở khoá luôn chuông đơn mới
+      const v = newEl.volume; newEl.volume = 0;
+      const p = newEl.play(); if (p && p.then) p.then(() => { newEl.pause(); newEl.currentTime = 0; newEl.volume = v; }).catch(() => { newEl.volume = v; });
+    }
+  }, { once: true }));
+
   // Kêu chuông. Trả về promise để chỗ gọi biết iOS có chặn hay không.
   let lastBeepAt = 0;
   function beep() {
@@ -513,6 +533,21 @@
     return keys;
   }
 
+  // NHẮC LẠI: đơn mới (state NEW) chưa ai đụng tới sau 45s thì kêu lại, tối đa 4 lần,
+  // phòng khi lần kêu đầu không ai nghe (bếp ồn, đang ra quầy).
+  const firstSeenAt = {}, remindCount = {};
+  setInterval(() => {
+    if (!primed) return;
+    const now = Date.now();
+    const waiting = tickets.filter(visible).filter(t => t.state === "NEW"
+      && !viewItems(t).some(it => it.done) && firstSeenAt[t.id]
+      && now - firstSeenAt[t.id] > 45000 && (remindCount[t.id] || 0) < 4);
+    if (waiting.length) {
+      waiting.forEach(t => { remindCount[t.id] = (remindCount[t.id] || 0) + 1; firstSeenAt[t.id] = now; });
+      beepNew();
+    }
+  }, 15000);
+
   function applyTickets(list) {
     const before = new Set(tickets.filter(visible).map(t => t.id));
     tickets = list;
@@ -533,11 +568,14 @@
     render();
     // Ưu tiên: huỷ đơn > (Expo) món ra pass / (Bếp) đơn mới.
     // Màn Expo KHÔNG kêu cho đơn mới — chỉ kêu khi có món sẵn sàng ra bàn.
+    // Saigon bán kiểu quầy: màn Expo (quầy) CŨNG phải kêu khi có ĐƠN MỚI, không chỉ
+    // khi món ra pass — trước đây Expo im với đơn mới nên quầy không biết có khách.
     if (newCancel && primed) alarm();
     else if (primed) {
-      if (STATION === "expo") { if (hasReady) beep(); }
-      else if (hasNew || hasAdded) beep();
+      if (hasNew || hasAdded) { beepNew(); }
+      else if (STATION === "expo" && hasReady) beep();
     }
+    if (hasNew) shown.forEach(t => { if (!firstSeenAt[t.id]) firstSeenAt[t.id] = Date.now(); });
     primed = true;   // lần đầu chỉ nạp đơn đang có, không coi là đơn mới
   }
 
