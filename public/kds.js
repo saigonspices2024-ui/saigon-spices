@@ -533,21 +533,6 @@
     return keys;
   }
 
-  // NHẮC LẠI: đơn mới (state NEW) chưa ai đụng tới sau 45s thì kêu lại, tối đa 4 lần,
-  // phòng khi lần kêu đầu không ai nghe (bếp ồn, đang ra quầy).
-  const firstSeenAt = {}, remindCount = {};
-  setInterval(() => {
-    if (!primed) return;
-    const now = Date.now();
-    const waiting = tickets.filter(visible).filter(t => t.state === "NEW"
-      && !viewItems(t).some(it => it.done) && firstSeenAt[t.id]
-      && now - firstSeenAt[t.id] > 45000 && (remindCount[t.id] || 0) < 4);
-    if (waiting.length) {
-      waiting.forEach(t => { remindCount[t.id] = (remindCount[t.id] || 0) + 1; firstSeenAt[t.id] = now; });
-      beepNew();
-    }
-  }, 15000);
-
   function applyTickets(list) {
     const before = new Set(tickets.filter(visible).map(t => t.id));
     tickets = list;
@@ -575,7 +560,6 @@
       if (hasNew || hasAdded) { beepNew(); }
       else if (STATION === "expo" && hasReady) beep();
     }
-    if (hasNew) shown.forEach(t => { if (!firstSeenAt[t.id]) firstSeenAt[t.id] = Date.now(); });
     primed = true;   // lần đầu chỉ nạp đơn đang có, không coi là đơn mới
   }
 
