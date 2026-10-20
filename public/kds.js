@@ -76,7 +76,11 @@
   soundPrompt.textContent = STATION === "expo"
     ? "🔔 TAP ANYWHERE to turn on sound"
     : "🔔 TAP ANYWHERE to turn on sound";
-  document.body.appendChild(soundPrompt);
+  // Chèn NGAY DƯỚI thanh tiêu đề (nằm trong luồng trang, đẩy lưới vé xuống) —
+  // trước đây nổi đè lên tên khách + giờ của vé đầu tiên.
+  const barEl = document.querySelector(".bar");
+  if (barEl && barEl.parentNode) barEl.parentNode.insertBefore(soundPrompt, barEl.nextSibling);
+  else document.body.appendChild(soundPrompt);
   function refreshPrompt() {
     soundPrompt.classList.toggle("show", soundOn && !audioReady);
   }

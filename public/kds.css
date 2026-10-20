@@ -485,8 +485,12 @@ code { background: var(--card); padding: 2px 6px; border-radius: 5px; font-size:
 .item .note { font-size: 22px; padding: 4px 10px; }
 .item .price { font-size: 18px; }
 .item .check { min-width: 40px; height: 40px; font-size: 24px; }
-/* Nhắc bật tiếng: băng to trên đầu, chạm BẤT KỲ đâu là bật (không chặn bấm). */
+/* Nhắc bật tiếng: DẢI ngang ngay dưới thanh tiêu đề, nằm trong luồng trang
+   (đẩy lưới vé xuống, KHÔNG đè lên tên/giờ của vé). Chạm BẤT KỲ đâu là bật. */
 .sound-prompt {
-  top: 70px; bottom: auto; left: 50%; font-size: 24px; padding: 18px 30px;
-  background: #dc2626; animation: pulse 1.2s infinite;
+  position: static; transform: none; display: none; opacity: 1;
+  margin: 0; width: 100%; box-sizing: border-box; border-radius: 0;
+  text-align: center; font-size: 20px; padding: 10px 16px;
+  background: #dc2626; color: #fff; box-shadow: none; animation: pulse 1.2s infinite;
 }
+.sound-prompt.show { display: block; transform: none; }
