@@ -63,27 +63,22 @@
   alertEl.preload = "auto";
   alertEl.volume = 1;
 
+  // Trạng thái tiếng hiện NGAY TRÊN NÚT (không còn dải nhắc che màn hình):
+  //  - muốn bật nhưng iPad chưa cho phát (chưa ai chạm) -> nút ĐỎ nhấp nháy
+  //    "Tap to enable sound"; chạm bất kỳ đâu là mở khoá.
+  //  - đã phát được -> xanh "Sound: On";  tắt hẳn -> xám "Sound: Off".
   function updateSoundBtn() {
-    soundBtn.classList.toggle("on", soundOn);
-    soundBtn.textContent = soundOn ? "🔊 Sound: On" : "🔇 Sound: Off";
+    const need = soundOn && !audioReady;
+    soundBtn.classList.toggle("on", soundOn && audioReady);
+    soundBtn.classList.toggle("need", need);
+    soundBtn.textContent = need ? "🔇 Tap to enable sound"
+                         : (soundOn ? "🔊 Sound: On" : "🔇 Sound: Off");
     soundBtn.title = "Tap to hear the chime · hold to mute/unmute";
   }
   updateSoundBtn();
 
-  // Lời nhắc "chạm để bật âm" — hiện khi muốn bật mà chưa phát được lần nào.
-  const soundPrompt = document.createElement("div");
-  soundPrompt.className = "sound-prompt";
-  soundPrompt.textContent = STATION === "expo"
-    ? "🔔 TAP ANYWHERE to turn on sound"
-    : "🔔 TAP ANYWHERE to turn on sound";
-  // Chèn NGAY DƯỚI thanh tiêu đề (nằm trong luồng trang, đẩy lưới vé xuống) —
-  // trước đây nổi đè lên tên khách + giờ của vé đầu tiên.
-  const barEl = document.querySelector(".bar");
-  if (barEl && barEl.parentNode) barEl.parentNode.insertBefore(soundPrompt, barEl.nextSibling);
-  else document.body.appendChild(soundPrompt);
-  function refreshPrompt() {
-    soundPrompt.classList.toggle("show", soundOn && !audioReady);
-  }
+  // (Đã bỏ dải "TAP ANYWHERE" — trạng thái hiển thị trên nút Sound.)
+  function refreshPrompt() { updateSoundBtn(); }
 
   /* --- Dựng sẵn tiếng chuông thành WAV (chạy 1 lần lúc mở trang) ------ */
 
@@ -209,7 +204,7 @@
       soundOn = !soundOn;
       localStorage.setItem("kds_sound", soundOn ? "on" : "off");
       updateSoundBtn();
-      if (soundOn) beep(); else soundPrompt.classList.remove("show");
+      if (soundOn) beep();
       refreshPrompt();
     }, 600);
   };
