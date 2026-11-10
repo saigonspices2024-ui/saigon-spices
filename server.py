@@ -701,6 +701,7 @@ def upsert_from_square(order, origin="square"):
             _apply_pay_fields(existing, ticket)
         else:
             _tickets[ticket["id"]] = ticket
+    _finalize_paid_served()
     broadcast()
 
 
@@ -754,6 +755,7 @@ def sync_from_square_orders(orders):
         _pending_vanish.update(vanished)
     if vanished:
         threading.Thread(target=_resolve_vanished, args=(vanished,), daemon=True).start()
+    _finalize_paid_served()   # tiền vừa về cho vé đã ra hết món -> đóng luôn
     broadcast()
     _save_state()   # lưu bảng đơn qua Upstash (bóp ga 12s) -> sống qua restart
 
@@ -795,6 +797,7 @@ def _resolve_vanished(ids):
                 # Model dine-in (Délice): đơn rời OPEN mà không phải mới-huỷ = đã trả/
                 # đóng nơi khác (POS thu xong / Expo bấm Thanh toán) -> gỡ khỏi màn.
                 del _tickets[tid]
+    _finalize_paid_served()   # vừa bật paid cho vé counter-service đã ra hết món
     broadcast()
 
 
@@ -996,6 +999,23 @@ def maybe_complete(ticket_id):
         ready = bool(t and _all_served(t) and t.get("paid"))
     if ready:
         _finalize_ticket(ticket_id)
+
+
+def _finalize_paid_served():
+    """Lưới an toàn: vé ĐÃ TRẢ TIỀN + đã GIAO HẾT món mà vẫn nằm trên màn -> đóng.
+
+    Lỗ hổng cũ (vé Table 33 treo 22 ngày, 10-11-2026): Expo chạm món "ra bàn" TRƯỚC,
+    khách trả ở POS SAU. maybe_complete() chỉ chạy lúc chạm món/bấm Served, nên khi
+    tiền về (poll/_resolve_vanished bật paid) không ai đóng vé; mọi món đã served nên
+    nút Served cũng ẩn -> kẹt vĩnh viễn (Upstash còn giữ qua restart). Gọi hàm này sau
+    mỗi lần cờ paid có thể đổi. KHÔNG ép đóng theo giờ: Saigon thu tiền trước, vé
+    paid-mà-chưa-ra-món là bình thường (bếp đang nấu)."""
+    with _lock:
+        ids = [k for k, t in _tickets.items()
+               if t.get("paid") and t.get("state") != "CANCELLED" and _all_served(t)]
+    for tid in ids:
+        print(f"[KDS] vé {tid} đã trả + đã ra hết món -> tự đóng", flush=True)
+        _finalize_ticket(tid)
 
 
 def _square_err(e):
