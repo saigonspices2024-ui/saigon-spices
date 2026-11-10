@@ -269,6 +269,24 @@
     }
   }
 
+  // Sticker "phải làm gì" trên đầu vé (nhìn xa biết ngay):
+  //   🛍️ túi  = takeaway / delivery -> đóng hộp mang về
+  //   🌳 cây  = khách ngồi NGOÀI (bàn 31–34) -> mang ra ngoài
+  //   🏠 nhà  = khách ngồi TRONG nhà (các bàn còn lại)
+  //   bàn 20–29 (dãy 2x) -> không gắn sticker (chủ chốt)
+  function sticker(t) {
+    if (t.type === "TAKEAWAY" || t.type === "DELIVERY") {
+      return { cls: "bag", emoji: "🛍️", label: "Take away" };
+    }
+    if (t.type !== "DINE_IN") return null;
+    const m = /^\s*(\d{1,3})\s*$/.exec(String(t.table || ""));
+    if (!m) return null;
+    const n = Number(m[1]);
+    if (n >= 20 && n <= 29) return null;
+    if (n >= 31 && n <= 34) return { cls: "tree", emoji: "🌳", label: "Outside" };
+    return { cls: "house", emoji: "🏠", label: "Inside" };
+  }
+
   function whereLabel(t) {
     // Bàn thật -> "Table 5". Bàn ảo khu takeaway đã có nhãn sẵn ("Takeaway 3").
     if (t.table) return t.type === "DINE_IN" ? "Table " + t.table : t.table;
@@ -403,11 +421,13 @@
         footBtn = `<span class="unpaid-note">⚠ Chưa thanh toán</span>`;
       }
       const foot = (payBtn || footBtn) ? `<div class="ticket-foot">${payBtn}${footBtn}</div>` : "";
+      const st = sticker(t);
       return `
-        <div class="ticket t-${esc((t.type || "").toLowerCase())} ${isNew ? "flash" : ""} ${allDone && !voided ? "alldone" : ""} ${killed ? "cancelled" : voided ? "hasvoid" : ""}" data-id="${t.id}">
+        <div class="ticket t-${esc((t.type || "").toLowerCase())} ${st ? "has-st st-" + st.cls : ""} ${isNew ? "flash" : ""} ${allDone && !voided ? "alldone" : ""} ${killed ? "cancelled" : voided ? "hasvoid" : ""}" data-id="${t.id}">
           <div class="ticket-head">
             ${t.redo ? `<span class="badge REDO">↻ REDO</span>` : ""}
-            ${t.type === "DINE_IN" ? "" :
+            ${st ? `<span class="sticker s-${st.cls}" title="${st.label}"><span class="st-emoji">${st.emoji}</span><span class="st-label">${st.label}</span></span>`
+              : (t.type === "DINE_IN" || t.type === "TAKEAWAY" || t.type === "DELIVERY") ? "" :
               `<span class="badge ${t.type}">${typeLabel(t.type)}</span>`}
             ${t.paid ? `<span class="badge paid">PAID</span>` : ""}
             <span class="where">${esc(whereLabel(t))}</span>

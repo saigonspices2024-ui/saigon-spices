@@ -203,6 +203,22 @@ html, body {
 .badge.TAKEAWAY { background: rgba(168,85,247,.18);  color: var(--take); }
 .badge.DELIVERY { background: rgba(20,184,166,.18);  color: var(--deliver); }
 .badge.UNKNOWN  { background: rgba(148,163,184,.18); color: #94a3b8; }
+/* Sticker "phải làm gì": túi = mang về, nhà = ra bàn trong nhà, cây = ra ngoài.
+   To, màu riêng, + viền màu bên trái cả vé -> nhìn xa vẫn biết ngay. */
+.sticker {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 4px 11px 4px 6px; border-radius: 12px;
+  border: 2px solid currentColor; flex: 0 0 auto;
+}
+.sticker .st-emoji { font-size: 34px; line-height: 1; }
+.sticker .st-label { font-size: 15px; font-weight: 900; text-transform: uppercase; letter-spacing: .6px; }
+.sticker.s-bag   { color: #d8b4fe; background: rgba(168,85,247,.22); }
+.sticker.s-house { color: #93c5fd; background: rgba(59,130,246,.22); }
+.sticker.s-tree  { color: #86efac; background: rgba(34,197,94,.22); }
+.ticket.has-st { border-left-width: 8px; }
+.ticket.st-bag   { border-left-color: #a855f7; }
+.ticket.st-house { border-left-color: #3b82f6; }
+.ticket.st-tree  { border-left-color: #22c55e; }
 /* where chiếm chỗ trống + cắt gọn (…) khi chật; timer dồn về phải, xuống dòng nếu hết chỗ */
 .ticket-head .where {
   font-size: 25px; font-weight: 800;
