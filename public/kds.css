@@ -215,10 +215,6 @@ html, body {
 .sticker.s-bag   { color: #d8b4fe; background: rgba(168,85,247,.22); }
 .sticker.s-house { color: #93c5fd; background: rgba(59,130,246,.22); }
 .sticker.s-tree  { color: #86efac; background: rgba(34,197,94,.22); }
-.ticket.has-st { border-left-width: 8px; }
-.ticket.st-bag   { border-left-color: #a855f7; }
-.ticket.st-house { border-left-color: #3b82f6; }
-.ticket.st-tree  { border-left-color: #22c55e; }
 /* where chiếm chỗ trống + cắt gọn (…) khi chật; timer dồn về phải, xuống dòng nếu hết chỗ */
 .ticket-head .where {
   font-size: 25px; font-weight: 800;
@@ -512,3 +508,14 @@ code { background: var(--card); padding: 2px 6px; border-radius: 5px; font-size:
   background: #dc2626; color: #fff; box-shadow: none; animation: pulse 1.2s infinite;
 }
 .sound-prompt.show { display: block; transform: none; }
+
+/* ---- VIỀN THEO STICKER (10-11): 3 màu rõ rệt, viền CẢ VÉ + tô nhẹ đầu vé.
+   Đặt CUỐI file để thắng viền cũ (takeaway đỏ / dine-in xanh / "đã xong" xanh).
+   Chỉ đơn huỷ / có món void mới được đè viền đỏ cảnh báo. ---- */
+.ticket.has-st:not(.cancelled):not(.hasvoid) { border-width: 3px; border-left-width: 12px; }
+.ticket.st-bag:not(.cancelled):not(.hasvoid)   { border-color: #a855f7; }
+.ticket.st-house:not(.cancelled):not(.hasvoid) { border-color: #3b82f6; }
+.ticket.st-tree:not(.cancelled):not(.hasvoid)  { border-color: #22c55e; }
+.ticket.st-bag:not(.cancelled):not(.hasvoid) .ticket-head   { background: rgba(168,85,247,.22); }
+.ticket.st-house:not(.cancelled):not(.hasvoid) .ticket-head { background: rgba(59,130,246,.22); }
+.ticket.st-tree:not(.cancelled):not(.hasvoid) .ticket-head  { background: rgba(34,197,94,.22); }
