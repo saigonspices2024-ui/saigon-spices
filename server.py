@@ -54,7 +54,9 @@ HOLD_TILL_DONE = os.environ.get("KDS_HOLD_TILL_DONE", "1").strip().lower() not i
 # Đơn ĐÃ BẤM DONE (bếp nấu xong): chặn BỀN, đừng để poll thêm lại dù Square còn
 # báo OPEN (đơn chưa trả ở POS vẫn OPEN). order_id -> timestamp, dọn sau TTL.
 _done_ids = {}
-_DONE_TTL_S = 12 * 3600
+# Phải DÀI HƠN cửa sổ đọc đơn (KDS_MAX_ORDER_AGE_HOURS=24h): trước đây 12h -> đơn
+# bấm Done lúc 9h tối mà POS chưa đóng bill (vẫn OPEN) bị quên lúc 9h sáng và HIỆN LẠI.
+_DONE_TTL_S = 48 * 3600
 _done_lock = threading.Lock()
 
 # ---------------------------------------------------------------------------
@@ -975,6 +977,64 @@ def _finalize_ticket(ticket_id):
     broadcast()
 
 
+def clear_all(reason="manual"):
+    """ĐÓNG CA: gỡ HẾT vé khỏi Bếp + Expo (kể cả vé chưa trả / chưa ra món). KHÔNG
+    đụng tới đơn trên Square (POS tự lo bill). Mỗi vé ghi History + chặn bền
+    (_done_ids) để poll không thêm lại dù Square còn báo OPEN. Trả số vé đã gỡ."""
+    now = time.time()
+    with _lock:
+        snaps = list(_tickets.values())
+        for t in snaps:
+            t["completed_at"] = _now_ms()
+            if t.get("origin") == "square":
+                _done_ids[t["id"]] = now
+                _recently_closed[t["id"]] = now
+            _merge_suppress.pop(t["id"], None)
+        _tickets.clear()
+        _pending_vanish.clear()
+    for t in snaps:
+        record_history(t, "CANCELLED" if t.get("state") == "CANCELLED" else "SERVED")
+    _save_state(force=True)
+    broadcast()
+    print("[KDS] đóng ca (%s): gỡ %d vé" % (reason, len(snaps)), flush=True)
+    return len(snaps)
+
+
+# Tự đóng ca mỗi đêm: sau giờ này (giờ quán) mà còn vé trên màn thì gỡ hết, 1 lần/đêm.
+# Saigon đóng cửa ~20:30 nên 00:00 an toàn. "" = tắt. Đổi qua env KDS_AUTO_CLEAR_AT.
+AUTO_CLEAR_AT = os.environ.get("KDS_AUTO_CLEAR_AT", "00:00").strip()
+AUTO_CLEAR_WINDOW_MIN = 6 * 60   # chỉ tự dọn trong 6 tiếng kể từ giờ đặt (vd 00:00 -> 06:00)
+
+
+def _auto_clear_due(now, at_hm, last_key):
+    """(nên dọn?, khoá-đêm). Dọn 1 lần mỗi đêm trong cửa sổ [at, at+6h)."""
+    h, m = at_hm
+    start = h * 60 + m
+    mins = now.hour * 60 + now.minute
+    in_window = (mins - start) % 1440 < AUTO_CLEAR_WINDOW_MIN
+    key = (now - datetime.timedelta(minutes=start)).date()   # 1 khoá cho cả đêm
+    return in_window and key != last_key, key
+
+
+def _auto_clear_loop():
+    if not AUTO_CLEAR_AT:
+        return
+    try:
+        at_hm = tuple(int(x) for x in AUTO_CLEAR_AT.split(":"))
+    except ValueError:
+        at_hm = (0, 0)
+    last_key = None
+    while True:
+        due, key = _auto_clear_due(datetime.datetime.now(_sydney_tz()), at_hm, last_key)
+        if due:
+            last_key = key
+            with _lock:
+                n = len(_tickets)
+            if n:
+                clear_all("tự động %s" % AUTO_CLEAR_AT)
+        time.sleep(60)
+
+
 def mark_paid(ticket_id):
     """Thu tiền xong -> đánh dấu ĐÃ TRẢ. KHÔNG gỡ vé ngay: đơn chỉ hoàn tất khi
     VỪA trả tiền VỪA giao hết món (khách trả trước ăn sau thì vé vẫn nằm ở Bếp +
@@ -1617,6 +1677,10 @@ class Handler(BaseHTTPRequestHandler):
                 upsert_from_square(order, origin="webhook")
             return self._send_json({"ok": True})
 
+        if path == "/api/clear-all":
+            n = clear_all("nút End of day")
+            return self._send_json({"ok": True, "cleared": n})
+
         if path.startswith("/api/tickets/") and path.endswith("/bump"):
             tid = path.split("/")[3]
             body = self._read_body()
@@ -1752,6 +1816,7 @@ def main():
     POLLER.start()  # tự poll Square nếu đã cấu hình token trong .env
     threading.Thread(target=_station_map_loop, daemon=True).start()
     threading.Thread(target=_keepalive_loop, daemon=True).start()
+    threading.Thread(target=_auto_clear_loop, daemon=True).start()
     print(f"  • Trạm bếp       : {', '.join(STATIONS) if STATIONS else '1 bếp (không phân trạm)'}")
     print(f"Saigon Spices KDS chạy tại http://localhost:{PORT}")
     print(f"  • Bảng điều khiển : http://localhost:{PORT}/")

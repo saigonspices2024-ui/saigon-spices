@@ -34,6 +34,17 @@ def order_window_start():
     if hours <= 0:
         return None
     dt = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=hours)
+    # NGÀY MỚI = BẢNG MỚI: không đọc đơn OPEN tạo TRƯỚC 0h hôm nay (giờ quán). Đơn POS
+    # hôm qua chưa đóng bill vẫn OPEN trên Square -> trước đây sáng hôm sau hiện lại
+    # trên bếp. Tắt bằng env KDS_DAY_CUTOFF=0.
+    if os.environ.get("KDS_DAY_CUTOFF", "1").strip().lower() not in ("0", "false", "no", "off"):
+        try:
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo(os.environ.get("KDS_TZ", "Australia/Sydney"))
+            midnight = datetime.datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+            dt = max(dt, midnight.astimezone(datetime.timezone.utc))
+        except Exception:
+            pass
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
