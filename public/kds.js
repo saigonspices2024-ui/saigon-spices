@@ -847,6 +847,20 @@
   }
 
   esc.__ = 0;
+  // --- End of day: xoá hết vé trên Bếp + Expo (không đụng Square) ---
+  const eodBtn = document.getElementById("eodBtn");
+  if (eodBtn) eodBtn.addEventListener("click", () => {
+    const n = document.querySelectorAll("#grid .ticket").length;
+    if (!confirm("End of day: clear ALL " + n + " order(s) from Kitchen + Expo?\n\n" +
+                 "They move to History. Orders on Square/POS are NOT changed.")) return;
+    eodBtn.disabled = true;
+    fetch("/api/clear-all", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+      .then((r) => r.json())
+      .then((d) => { eodBtn.textContent = "✓ Cleared " + (d.cleared || 0); })
+      .catch(() => alert("Could not clear — check the connection and try again."))
+      .finally(() => setTimeout(() => { eodBtn.disabled = false; eodBtn.textContent = "🧹 End of day"; }, 2500));
+  });
+
   function esc(s) {
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

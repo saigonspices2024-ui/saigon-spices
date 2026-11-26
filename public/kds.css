@@ -75,6 +75,8 @@ html, body {
   text-decoration: none;
 }
 .hist-btn:hover { color: var(--text); border-color: var(--accent); }
+.eod-btn { cursor: pointer; font-family: inherit; }
+.eod-btn:hover { color: #fff; background: #dc2626; border-color: #dc2626; }
 .station-tag.hist { background: rgba(59,130,246,.15); color: var(--accent); }
 /* Nút Thu tiền (chỉ màn Expo): nhảy sang màn /staff của app order để bấm
    Terminal — biến máy Expo thành máy ra món + tính tiền cùng lúc. Tông xanh lá. */
